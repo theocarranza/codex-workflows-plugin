@@ -171,6 +171,46 @@ def main():
             print(json.dumps({"permissionDecision": "deny", "reason": reason}))
             sys.exit(0)
 
+        # Check mv/git mv commands affecting Tickets
+        cmd_tokens = cmd.split()
+        ticket_paths = [t for t in cmd_tokens if "Tickets/" in t]
+        if len(ticket_paths) >= 2 and any(m in cmd_tokens for m in ["mv", "git"]):
+            src_path = ticket_paths[0].strip("'\"")
+            dst_path = ticket_paths[1].strip("'\"")
+            
+            abs_src = os.path.abspath(os.path.join(project_root, src_path))
+            abs_dst = os.path.abspath(os.path.join(project_root, dst_path))
+            
+            if "Tickets/Ready/" in abs_src:
+                if "Tickets/Active/" not in abs_dst:
+                    reason = f"Tickets from Tickets/Ready/ must be moved to Tickets/Active/ when started, not {os.path.basename(abs_dst)}."
+                    log_debug(f"DENIED: {reason}")
+                    print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                    sys.exit(0)
+            elif "Tickets/Active/" in abs_src:
+                is_bugfix = "bug" in os.path.basename(abs_src).lower()
+                if os.path.exists(abs_src):
+                    try:
+                        with open(abs_src, "r") as f:
+                            content = f.read()
+                        if "type: bug" in content or "type: bugfix" in content:
+                            is_bugfix = True
+                    except:
+                        pass
+                
+                if is_bugfix:
+                    if "Tickets/Resolved/" not in abs_dst:
+                        reason = f"Bugfix ticket {os.path.basename(abs_src)} must be moved to Tickets/Resolved/, not {os.path.basename(abs_dst)}."
+                        log_debug(f"DENIED: {reason}")
+                        print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                        sys.exit(0)
+                else:
+                    if "Tickets/Closed/" not in abs_dst:
+                        reason = f"Feature/Task ticket {os.path.basename(abs_src)} must be moved to Tickets/Closed/, not {os.path.basename(abs_dst)}."
+                        log_debug(f"DENIED: {reason}")
+                        print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                        sys.exit(0)
+
     # RULE 2: Markdown Allowlist
     file_path = arguments.get("AbsolutePath") or arguments.get("TargetFile") or arguments.get("path") or arguments.get("file") or ""
     if isinstance(file_path, str) and file_path.endswith(".md"):
@@ -183,6 +223,23 @@ def main():
     # RULE 3: Session Bootstrap Enforcer (for write operations)
     write_tools = ["write_to_file", "replace_file_content", "multi_replace_file_content"]
     if tool_name in write_tools:
+        # Prevent writing resolved/closed tickets in the wrong folder
+        if "Tickets/" in file_path:
+            abs_file_path = os.path.abspath(file_path)
+            filename = os.path.basename(abs_file_path)
+            is_bugfix = "bug" in filename.lower()
+            
+            if "Tickets/Resolved/" in abs_file_path and not is_bugfix:
+                reason = "Only bugfix tickets can be written to Tickets/Resolved/. Feature/Task tickets must go to Tickets/Closed/."
+                log_debug(f"DENIED: {reason}")
+                print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                sys.exit(0)
+            if "Tickets/Closed/" in abs_file_path and is_bugfix:
+                reason = "Bugfix tickets cannot be written to Tickets/Closed/. They must go to Tickets/Resolved/."
+                log_debug(f"DENIED: {reason}")
+                print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                sys.exit(0)
+
         if not is_allowed_markdown(file_path, vault_dir, project_root) or "Agent_Sessions" not in file_path:
             if not has_active_session_today(vault_dir):
                 reason = "Write blocked. You must initialize today's Agent Session log in AI_Codex_SeuMeiSimples/Agent_Sessions/ before making code modifications."

@@ -22,8 +22,9 @@ This workflow integrates Azure DevOps MCP with the Antigravity "Construction" Pr
 
 ## 3. Strategy & Implementation Lock (Stage II)
 
-1.  **Create Codex Ledger**: Initialize the state tracking file in the Obsidian Vault.
-    - **Path**: `AI_Codex/Tickets/Active/<ID>-<Kebab-Case-Title>.md`
+1.  **Create Codex Ledger**: Move the ledger ticket file from `AI_Codex/Projects/<project_name>/Tickets/Ready/` (where tickets reside when they are ready to be picked for implementation) to `AI_Codex/Projects/<project_name>/Tickets/Active/`.
+    - **Path**: `AI_Codex/Projects/<project_name>/Tickets/Active/<ID>-<Kebab-Case-Title>.md`
+    - **Status**: Update the YAML frontmatter `status` of the ticket to `active`.
 2.  **Branch Creation**: `{feature, bugfix, refactor, test}/{ticket number}-{ticket-name}`.
 3.  **Prepare Repository**: `git checkout develop && git pull origin develop`.
 4.  **Construct Implementation Plan**: 

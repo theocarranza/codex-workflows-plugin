@@ -112,5 +112,90 @@ class TestCodexEnforceHook(unittest.TestCase):
         res = self.run_hook(stdin)
         self.assertEqual(res["permissionDecision"], "allow")
 
+    def test_allow_ticket_move_ready_to_active(self):
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Ready/task-123.md {self.vault_dir}/Tickets/Active/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "allow")
+
+    def test_deny_ticket_move_ready_to_resolved(self):
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Ready/task-123.md {self.vault_dir}/Tickets/Resolved/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("must be moved to Tickets/Active/", res["reason"])
+
+    def test_allow_bugfix_move_active_to_resolved(self):
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Active/bug-123.md {self.vault_dir}/Tickets/Resolved/bug-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "allow")
+
+    def test_deny_bugfix_move_active_to_closed(self):
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Active/bug-123.md {self.vault_dir}/Tickets/Closed/bug-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("must be moved to Tickets/Resolved/", res["reason"])
+
+    def test_allow_task_move_active_to_closed(self):
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Active/task-123.md {self.vault_dir}/Tickets/Closed/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "allow")
+
+    def test_deny_task_move_active_to_resolved(self):
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Active/task-123.md {self.vault_dir}/Tickets/Resolved/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("must be moved to Tickets/Closed/", res["reason"])
+
+    def test_deny_write_task_to_resolved(self):
+        stdin = {
+            "name": "write_to_file",
+            "arguments": {
+                "TargetFile": f"{self.vault_dir}/Tickets/Resolved/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("Only bugfix tickets can be written to Tickets/Resolved/", res["reason"])
+
+    def test_deny_write_bugfix_to_closed(self):
+        stdin = {
+            "name": "write_to_file",
+            "arguments": {
+                "TargetFile": f"{self.vault_dir}/Tickets/Closed/bug-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("Bugfix tickets cannot be written to Tickets/Closed/", res["reason"])
+
 if __name__ == "__main__":
     unittest.main()
