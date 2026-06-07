@@ -1,0 +1,46 @@
+---
+description: Finalize a ticket, distill knowledge into the Codex, archive the Ledger, and move work to Done
+---
+
+# Resolve Ticket Workflow
+
+This workflow defines the step-by-step procedure when done with a ticket to ensure code quality, repository synchronization, pull request creation, YouTrack updates, and Codex documentation.
+
+## Phase 1: Local Verification & Quality Gate
+1. **Execute Pre-Merge Check**: Run the project's pre-merge check script to ensure code formatting, static analysis, and production build checks are fully passing:
+   ```bash
+   npm run ensure-can-merge
+   ```
+2. **Handle Warnings/Failures**: If `ensure-can-merge` fails or reports errors, the workflow MUST stop here. Fix the issues before proceeding.
+
+## Phase 2: Commit, Push & Pull Request Creation
+1. **Commit Remaining Changes**: Use Conventional Commits to commit any remaining local changes:
+   ```bash
+   git add .
+   git commit -m "<type>(<scope>): <subject>" -m "<body>"
+   ```
+2. **Push Branch**: Push the active local branch to the remote repository:
+   ```bash
+   git push origin <branch_name>
+   ```
+3. **Create Pull Request**: Create the Pull Request targeting the `unstable` branch on GitHub.
+
+## Phase 3: PR Review & Tracking (Conditional/Optional)
+1. **Execute PR Code Review** (Optional, user's discretion): Perform or request a PR review.
+2. **Move YouTrack Card** (Conditional to PR Code Review): Move the corresponding YouTrack card to "testing" (using YouTrack MCP or manually).
+3. **Address Comments**:
+   - Address PR comments by changing PR thread status to either *resolved* or *wont fix* (or equivalent).
+   - If changes are implemented to satisfy comments, repeat **Phase 1 (ensure-can-merge)**, commit, and push.
+
+## Phase 4: Merge & Synchronization
+1. **Merge Pull Request**: Once approved, merge the pull request into the `unstable` branch.
+2. **Update Codex Ledger & Session**:
+   - Move the ledger ticket file from `AI_Codex_SeuMeiSimples/Tickets/Active/` to `AI_Codex_SeuMeiSimples/Tickets/Resolved/`.
+   - Update the ledger ticket YAML frontmatter `status` to `resolved`.
+   - Document key changes, tech debt, and final considerations in the ledger ticket walkthrough.
+   - Close the current session file in `Agent_Sessions` and update links.
+3. **Sync Local Workspace**: Checkout the local `unstable` branch and pull the latest changes from origin:
+   ```bash
+   git checkout unstable
+   git pull origin unstable
+   ```
