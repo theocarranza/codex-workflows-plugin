@@ -126,7 +126,7 @@ def get_youtrack_issue_id_from_write(file_path: str, arguments: dict[str, Any]) 
     return None
 
 
-def infer_is_bugfix_ticket(file_path: str | None) -> bool:
+def infer_is_bugfix_ticket(file_path: str | None, content: str | None = None) -> bool:
     """Whether the ticket file declares itself a bugfix via YAML frontmatter.
 
     Reads the `type:` field from the ticket's frontmatter and returns `True`
@@ -134,11 +134,13 @@ def infer_is_bugfix_ticket(file_path: str | None) -> bool:
     excluded to avoid false positives (e.g. a file named `debug-something.md`).
     Returns `False` when the file is absent or unreadable.
     """
+    if content:
+        return "type: bug" in content or "type: bugfix" in content
     if not file_path or not os.path.exists(file_path):
         return False
     try:
         with open(file_path, "r", encoding="utf-8") as file:
-            content = file.read()
-        return "type: bug" in content or "type: bugfix" in content
+            file_content = file.read()
+        return "type: bug" in file_content or "type: bugfix" in file_content
     except Exception:
         return False

@@ -230,14 +230,14 @@ def run(client: str, input_data: dict[str, Any]) -> int:
             vault_dir=vault_dir,
             markdown_allowed=markdown_allowed,
             session_active=has_active_session_today(vault_dir),
-            is_bugfix_ticket=infer_is_bugfix_ticket(file_path),
+            is_bugfix_ticket=infer_is_bugfix_ticket(file_path, arguments.get("CodeContent")),
         )
     )
     if markdown_decision.is_denied() and isinstance(file_path, str) and file_path.endswith(".md") and not markdown_allowed:
         log_debug(f"DENIED: {markdown_decision.reason}")
         emit_decision(client, PolicyDecision.deny(markdown_decision.reason or "Denied"))
         return 0
-
+ 
     write_tools = ["write_to_file", "replace_file_content", "multi_replace_file_content"]
     if tool_name in write_tools:
         write_decision = evaluate(
@@ -249,7 +249,7 @@ def run(client: str, input_data: dict[str, Any]) -> int:
                 vault_dir=vault_dir,
                 markdown_allowed=markdown_allowed,
                 session_active=has_active_session_today(vault_dir),
-                is_bugfix_ticket=infer_is_bugfix_ticket(file_path),
+                is_bugfix_ticket=infer_is_bugfix_ticket(file_path, arguments.get("CodeContent")),
             )
         )
         if write_decision.is_denied():
@@ -283,12 +283,6 @@ def run(client: str, input_data: dict[str, Any]) -> int:
                     emit_decision(client, PolicyDecision.deny(reason))
                     return 0
 
-        if "Agent_Sessions" not in file_path and not has_active_session_today(vault_dir):
-            vault_name = os.path.basename(vault_dir) if vault_dir else "AI_Codex"
-            reason = f"Write blocked. You must initialize today's Agent Session log in {vault_name}/Agent_Sessions/ before making code modifications."
-            log_debug(f"DENIED: {reason}")
-            emit_decision(client, PolicyDecision.deny(reason))
-            return 0
 
     log_debug("ALLOWED")
     emit_decision(client, PolicyDecision.allow())

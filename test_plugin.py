@@ -179,7 +179,8 @@ class TestCodexEnforceHook(unittest.TestCase):
         stdin = {
             "name": "write_to_file",
             "arguments": {
-                "TargetFile": f"{self.vault_dir}/Tickets/Resolved/task-123.md"
+                "TargetFile": f"{self.vault_dir}/Tickets/Resolved/task-123.md",
+                "CodeContent": "---\ntype: task\n---"
             }
         }
         res = self.run_hook(stdin)
@@ -190,7 +191,8 @@ class TestCodexEnforceHook(unittest.TestCase):
         stdin = {
             "name": "write_to_file",
             "arguments": {
-                "TargetFile": f"{self.vault_dir}/Tickets/Closed/bug-123.md"
+                "TargetFile": f"{self.vault_dir}/Tickets/Closed/bug-123.md",
+                "CodeContent": "---\ntype: bug\n---"
             }
         }
         res = self.run_hook(stdin)
