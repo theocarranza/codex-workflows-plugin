@@ -71,6 +71,39 @@ class TestInstallerSmoke(unittest.TestCase):
                 "python3 skills/codex_workflows/scripts/claude_enforce_hook.py",
             )
 
+    def test_install_with_dest_syncs_workflows_to_agent_dir(self):
+        """When --dest is provided, .agent/workflows/ files are synced to the target."""
+        with tempfile.TemporaryDirectory() as tempdir:
+            completed = subprocess.run(
+                [sys.executable, "-m", "scripts.installer.cli",
+                 "--target", "gemini", "--dest", tempdir],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = json.loads(completed.stdout)
+            self.assertEqual(result["target"], "gemini")
+            workflows_dir = Path(tempdir) / ".agent" / "workflows"
+            self.assertTrue(workflows_dir.is_dir(), "workflows dir should have been created")
+            md_files = list(workflows_dir.glob("*.md"))
+            self.assertGreater(len(md_files), 0, "at least one workflow file should be synced")
+
+    def test_install_with_dest_writes_target_config_in_place(self):
+        """When --dest is provided, the hook config is written at the correct relative path."""
+        with tempfile.TemporaryDirectory() as tempdir:
+            subprocess.run(
+                [sys.executable, "-m", "scripts.installer.cli",
+                 "--target", "antigravity", "--dest", tempdir],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            hooks_file = Path(tempdir) / ".agents" / "hooks.json"
+            self.assertTrue(hooks_file.exists(), ".agents/hooks.json should have been written")
+            content = json.loads(hooks_file.read_text(encoding="utf-8"))
+            self.assertIn("codex-enforcer", content)
+
 
 if __name__ == "__main__":
     unittest.main()
+

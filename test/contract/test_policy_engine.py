@@ -69,6 +69,46 @@ class TestPolicyEngine(unittest.TestCase):
 
         self.assertFalse(decision.is_denied())
 
+    def test_session_denial_message_uses_dynamic_vault_name(self):
+        """Ensures the denial message reflects the event's vault_dir, not a hard-coded name."""
+        event = CanonicalToolEvent(
+            client="codex",
+            tool_name="write_to_file",
+            file_path="/tmp/my-other-project/lib/foo.dart",
+            vault_dir="/tmp/my-other-project/AI_Codex_MyProject",
+            session_active=False,
+        )
+
+        decision = evaluate(event)
+
+        self.assertTrue(decision.is_denied())
+        self.assertIn("AI_Codex_MyProject", decision.reason or "")
+        self.assertNotIn("AI_Codex_SeuMeiSimples", decision.reason or "")
+
+    def test_denies_bugfix_ticket_written_to_closed(self):
+        event = CanonicalToolEvent(
+            client="codex",
+            tool_name="write_to_file",
+            file_path="/tmp/project/AI_Codex/Tickets/Closed/bug-fix-123.md",
+            is_bugfix_ticket=True,
+        )
+
+        decision = evaluate(event)
+
+        self.assertTrue(decision.is_denied())
+
+    def test_allows_bugfix_ticket_written_to_resolved(self):
+        event = CanonicalToolEvent(
+            client="codex",
+            tool_name="write_to_file",
+            file_path="/tmp/project/AI_Codex/Tickets/Resolved/bug-fix-123.md",
+            is_bugfix_ticket=True,
+        )
+
+        decision = evaluate(event)
+
+        self.assertFalse(decision.is_denied())
+
 
 if __name__ == "__main__":
     unittest.main()
