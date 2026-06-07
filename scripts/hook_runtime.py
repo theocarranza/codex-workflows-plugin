@@ -20,6 +20,7 @@ from scripts.adapters import (
 )
 from scripts.payload_capture import capture_hook_payload
 from scripts.ticket_runtime import (
+    YouTrackCheckResult,
     check_youtrack_state_in_transcript,
     extract_ticket_paths,
     get_youtrack_issue_id_from_ticket,
@@ -164,7 +165,8 @@ def run(client: str, input_data: dict[str, Any]) -> int:
                 issue_id = get_youtrack_issue_id_from_ticket(abs_src)
                 if issue_id:
                     transcript_path = input_data.get("transcriptPath")
-                    if not check_youtrack_state_in_transcript(transcript_path, issue_id, ["In Progress"]):
+                    yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, ["In Progress"])
+                    if not yt_result.verified:
                         try:
                             subprocess.run(
                                 [
@@ -202,9 +204,17 @@ def run(client: str, input_data: dict[str, Any]) -> int:
             if issue_id:
                 transcript_path = input_data.get("transcriptPath")
                 allowed_end_states = ["Done", "Fixed", "Test", "Testing", "Resolved"]
-                if not check_youtrack_state_in_transcript(transcript_path, issue_id, allowed_end_states):
+                yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, allowed_end_states)
+                if not yt_result.verified:
+                    detail = (
+                        "transcript not found in conversation context"
+                        if yt_result.reason == "transcript_missing"
+                        else f"state not recorded as one of {allowed_end_states}"
+                    )
                     reason = (
-                        f"Move blocked. You must update YouTrack issue {issue_id} state to 'Done', 'Fixed', or 'Test'/'Testing'/'Resolved' via call_mcp_tool before moving the ticket to Resolved/Closed."
+                        f"Move blocked. You must update YouTrack issue {issue_id} state to "
+                        f"'Done', 'Fixed', or 'Test'/'Testing'/'Resolved' via call_mcp_tool before "
+                        f"moving the ticket to Resolved/Closed ({detail})."
                     )
                     log_debug(f"DENIED: {reason}")
                     emit_decision(client, PolicyDecision.deny(reason))
@@ -258,14 +268,24 @@ def run(client: str, input_data: dict[str, Any]) -> int:
                 else:
                     expected_states = ["Done", "Fixed", "Test", "Testing", "Resolved"]
                     state_desc = "'Done', 'Fixed', or 'Test'/'Testing'/'Resolved'"
-                if not check_youtrack_state_in_transcript(transcript_path, issue_id, expected_states):
-                    reason = f"Write blocked. You must update YouTrack issue {issue_id} state to {state_desc} via call_mcp_tool before saving/moving the ticket."
+                yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, expected_states)
+                if not yt_result.verified:
+                    detail = (
+                        "transcript not found in conversation context"
+                        if yt_result.reason == "transcript_missing"
+                        else f"state not recorded as one of {expected_states}"
+                    )
+                    reason = (
+                        f"Write blocked. You must update YouTrack issue {issue_id} state to "
+                        f"{state_desc} via call_mcp_tool before saving/moving the ticket ({detail})."
+                    )
                     log_debug(f"DENIED: {reason}")
                     emit_decision(client, PolicyDecision.deny(reason))
                     return 0
 
         if "Agent_Sessions" not in file_path and not has_active_session_today(vault_dir):
-            reason = "Write blocked. You must initialize today's Agent Session log in AI_Codex_SeuMeiSimples/Agent_Sessions/ before making code modifications."
+            vault_name = os.path.basename(vault_dir) if vault_dir else "AI_Codex"
+            reason = f"Write blocked. You must initialize today's Agent Session log in {vault_name}/Agent_Sessions/ before making code modifications."
             log_debug(f"DENIED: {reason}")
             emit_decision(client, PolicyDecision.deny(reason))
             return 0

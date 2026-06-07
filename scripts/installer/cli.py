@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,8 @@ from .targets import Target, normalize_target, target_config_paths, target_hook_
 
 @dataclass(frozen=True)
 class InstallResult:
+    """Result of a plugin installation pass."""
+
     target: Target
     written_codex_config: bool
     written_shared_assets: bool
@@ -20,12 +23,59 @@ class InstallResult:
     merged_config: dict[str, Any] | None = None
 
 
+def _plugin_root() -> Path:
+    """The root directory of this plugin package."""
+    return Path(__file__).parent.parent.parent
+
+
+def sync_shared_assets(dest_root: str | Path) -> None:
+    """Copies workflow and rules markdown files from the plugin into a destination project.
+
+    Syncs `.agent/workflows/*.md` and `.agent/rules/*.md` from the plugin root
+    to the corresponding directories under [dest_root]. Missing destination
+    directories are created automatically. Existing files are overwritten.
+    """
+    plugin_root = _plugin_root()
+    dest = Path(dest_root)
+
+    for rel in ("workflows", "rules"):
+        src_dir = plugin_root / ".agent" / rel
+        dst_dir = dest / ".agent" / rel
+        if not src_dir.is_dir():
+            continue
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for md_file in src_dir.glob("*.md"):
+            shutil.copy2(md_file, dst_dir / md_file.name)
+
+
+def write_target_config(
+    merged_config: dict[str, Any],
+    config_path: str,
+    dest_root: str | Path,
+) -> Path:
+    """Writes the merged hook configuration JSON to the target config path.
+
+    Creates any missing parent directories. Returns the path of the written file.
+    """
+    dest = Path(dest_root) / config_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(merged_config, indent=2), encoding="utf-8")
+    return dest
+
+
 def install(
     target: str | Target,
     profile: str = "generic",
     *,
     existing_hooks: dict[str, Any] | None = None,
+    dest_root: str | Path | None = None,
 ) -> InstallResult:
+    """Computes (and optionally writes) plugin installation artifacts for a host target.
+
+    When [dest_root] is provided, actually writes the hook config and syncs
+    shared assets to the filesystem. When omitted, the function operates in
+    dry-run mode and only returns the computed [InstallResult].
+    """
     normalized_target = normalize_target(target)
     shared_assets = normalized_target in {Target.UNIVERSAL, Target.ALL_AGENTS}
     codex_config = normalized_target in {Target.CODEX, Target.ALL_AGENTS}
@@ -107,6 +157,11 @@ def install(
             }
         merged_config = merge_hook_configs(existing_hooks, desired_hooks)
 
+    if dest_root is not None:
+        sync_shared_assets(dest_root)
+        if merged_config is not None and config_paths:
+            write_target_config(merged_config, config_paths[0], dest_root)
+
     return InstallResult(
         target=normalized_target,
         written_codex_config=codex_config,
@@ -121,10 +176,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Install Codex workflow assets for a specific client target.")
     parser.add_argument("--target", default="codex", help="Target client: codex, gemini, antigravity, claude, universal, all-agents")
     parser.add_argument("--profile", default="generic", help="Installer profile name")
-    parser.add_argument("--output", help="Optional path to write the merged hooks config")
+    parser.add_argument(
+        "--output",
+        help="Optional path to write the merged hooks config (dry-run; does not sync workflows)",
+    )
+    parser.add_argument(
+        "--dest",
+        help="Destination project root. When set, writes the hook config and syncs .agent/workflows/ and .agent/rules/ to the project.",
+    )
     args = parser.parse_args()
 
-    result = install(args.target, profile=args.profile)
+    result = install(args.target, profile=args.profile, dest_root=args.dest)
+
     if args.output and result.merged_config is not None:
         output_path = Path(args.output).expanduser()
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -148,3 +211,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -20,8 +20,9 @@ def evaluate(event: CanonicalToolEvent) -> PolicyDecision:
         return ticket_decision
 
     if _requires_session(event) and not event.session_active and not _is_ticket_path(event):
+        vault_name = event.vault_dir.rsplit("/", 1)[-1] if event.vault_dir else "AI_Codex"
         return PolicyDecision.deny(
-            "Write blocked. You must initialize today's Agent Session log in AI_Codex_SeuMeiSimples/Agent_Sessions/ before making code modifications."
+            f"Write blocked. You must initialize today's Agent Session log in {vault_name}/Agent_Sessions/ before making code modifications."
         )
 
     return PolicyDecision.allow()

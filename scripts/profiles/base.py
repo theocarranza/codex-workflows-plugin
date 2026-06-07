@@ -1,3 +1,16 @@
+"""Workspace profiles for the codex-workflows-plugin installer.
+
+Each profile captures project-specific conventions (vault name, ticket root,
+tracker, verify command, default branch) for a class of host workspace.
+
+.. note::
+    Profiles are **v0.2 scaffolding**. They are defined here but not yet
+    consumed by ``hook_runtime.py`` or the installer. A future pass will wire
+    them in so that a single ``--profile`` flag controls all runtime behaviour.
+
+    # TODO(v0.2): wire WorkspaceProfile into hook_runtime and installer CLI.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "description": "Client-adaptive workflow and enforcement plugin for Codex-style agent hosts",
   "author": {
-    "name": "OpenAI"
+    "name": "agentrick"
   },
   "skills": "./skills/",
   "interface": {
