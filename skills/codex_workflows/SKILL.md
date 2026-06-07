@@ -5,7 +5,7 @@ description: "Manage, enforce, and execute AI Codex workflows (Start Ticket, Res
 
 # Codex Workflows Skill
 
-This skill provides a standardized way to define, install, and execute development workflows based on the AI Codex architecture. It packages git/session hooks, local session bootstrap enforcement, and standardized workflow checklists.
+This skill provides a standardized way to define, install, and execute development workflows based on the AI Codex architecture. It packages git/session hooks, local session bootstrap enforcement, standardized workflow checklists, and the migration path toward a real Codex plugin with client-adaptive adapters.
 
 ## Purpose
 
@@ -24,13 +24,32 @@ The following workflows are bundled in the skill's `resources/` folder:
 - **`workflows-tdd-bug-fix.md`**: Red-Green bug fixing steps.
 - **`workflows-git-origin-sync.md`**: Keeping branches in sync with upstream.
 
+## Focused Migration Skills
+
+The migration is splitting the omnibus workflow into smaller skills:
+- `bootstrap`
+- `start-ticket`
+- `resolve-ticket`
+- `repository-sync`
+- `commit-prep`
+- `automated-tests`
+
 ## Hooks Installed
 
 The skill contains pre-tool git/session execution hooks:
 - **`codex_enforce_hook.py`**: Intercepts tool calls to prevent destructive deletions in the vault, enforce markdown read/write allowlists, and enforce session bootstrapping prior to code modification.
+- **`gemini_enforce_hook.py`**: Gemini CLI host wrapper that reuses the shared policy core with Gemini hook I/O.
+- **`antigravity_enforce_hook.py`**: Antigravity host wrapper that reuses the shared policy core with Antigravity hook I/O.
+- **`claude_enforce_hook.py`**: Claude Code host wrapper that reuses the shared policy core with Claude hook I/O.
+
+## Plugin Packaging
+
+- The Codex plugin manifest lives at `.codex-plugin/plugin.json`.
+- Hook routing for Codex lives at `hooks/hooks.json`.
+- The shared policy/adaptor split is part of the migration work, not this skill's current runtime behavior.
 
 ## Sync Command / Usage
 
 To install or sync these workflows into a project's `.agent/workflows/` directory:
 1. Copy the markdown templates from this skill's `resources/` directory to the target project's `.agent/workflows/` directory.
-2. Run the `scripts/install_codex_hooks.sh` script to set up the PreToolUse hook configuration in the system `hooks.json`.
+2. Run the `scripts/install_codex_hooks.sh` script to set up the host-specific hook configuration for the chosen target.

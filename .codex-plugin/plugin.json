@@ -1,0 +1,24 @@
+{
+  "name": "codex-workflows-plugin",
+  "version": "0.1.0",
+  "description": "Client-adaptive workflow and enforcement plugin for Codex-style agent hosts",
+  "author": {
+    "name": "OpenAI"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Workflows",
+    "shortDescription": "Workflow enforcement and session governance",
+    "longDescription": "A client-adaptive plugin for workflow enforcement, session bootstrapping, and ticket lifecycle coordination.",
+    "developerName": "OpenAI",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Manage sessions and workflows"
+    ],
+    "brandColor": "#3B82F6"
+  }
+}

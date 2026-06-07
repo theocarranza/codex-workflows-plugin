@@ -2,12 +2,22 @@
 
 A workspace automation plugin that registers git and tool hooks, enforces session bootstrapping, and mandates ticket lifecycle folder movements across the AI Codex vault.
 
+This repository is being migrated toward a real Codex plugin with a shared policy core, host adapters, and client-targeted installation profiles. The current implementation is still a legacy hook bundle, so the migration keeps packaging, policy, and installer concerns separate.
+
 ## Purpose
 
 To ensure that autonomous agents consistently follow strict repository governance protocols:
 1. **Mandatory Session Bootstrap**: Initializing today's session record before editing files.
 2. **Commit Pipeline Verification**: Running pre-merge checks (`ensure-can-merge`) before commits/PRs.
 3. **Structured Ticket Progression**: Validating and gating ticket status folder transitions, YouTrack moves, and code verification.
+
+## Packaging Boundary
+
+- Codex plugin metadata lives in `.codex-plugin/plugin.json`.
+- Lifecycle hook wiring lives in `hooks/hooks.json`.
+- Shared workflows and rules stay in `skills/codex_workflows/`.
+- Repository-local migration tracking lives in `AI_Codex/`.
+- Focused migration skills live in `skills/bootstrap/`, `skills/start-ticket/`, `skills/resolve-ticket/`, `skills/repository-sync/`, `skills/commit-prep/`, and `skills/automated-tests/`.
 
 ---
 
@@ -58,6 +68,16 @@ To sync rules and install hooks into a project:
    ```
    This will:
    - Make the hook script executable.
-   - Register hook rules in `~/.gemini/config/hooks.json`.
+   - Register Codex hooks in `hooks/hooks.json`.
    - Synchronize reference workflows to the project's `.agent/workflows/` directory.
    - Synchronize coding rules to the project's `.agent/rules/` directory.
+
+### Host Targets
+
+The installer now targets the actual host surface:
+
+- `codex` writes `hooks/hooks.json`
+- `gemini` writes `.gemini/settings.json`
+- `antigravity` writes `.agents/hooks.json`
+- `claude` writes `.claude/settings.json`
+- `universal` installs only shared assets

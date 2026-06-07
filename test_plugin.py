@@ -197,6 +197,20 @@ class TestCodexEnforceHook(unittest.TestCase):
         self.assertEqual(res["permissionDecision"], "deny")
         self.assertIn("Bugfix tickets cannot be written to Tickets/Closed/", res["reason"])
 
+    def test_plugin_manifest_exists(self):
+        manifest_path = os.path.join(self.old_cwd, ".codex-plugin", "plugin.json")
+        self.assertTrue(os.path.isfile(manifest_path))
+
+    def test_plugin_manifest_is_valid_codex_manifest(self):
+        manifest_path = os.path.join(self.old_cwd, ".codex-plugin", "plugin.json")
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+
+        self.assertEqual(manifest["name"], "codex-workflows-plugin")
+        self.assertIn("skills", manifest)
+        self.assertIn("interface", manifest)
+        self.assertNotIn("hooks", manifest)
+
     def create_mock_transcript(self, issue_id, state):
         transcript_file = os.path.join(self.test_dir, "mock_transcript.jsonl")
         step = {

@@ -1,50 +1,47 @@
 #!/bin/bash
 set -e
 
-# Resolve absolute path of this script's directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOOK_SCRIPT="$PROJECT_ROOT/scripts/codex_enforce_hook.py"
-CONFIG_DIR="$HOME/.gemini/config"
-HOOKS_JSON="$CONFIG_DIR/hooks.json"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TARGET="${1:-codex}"
+PROFILE="${2:-generic}"
 
-echo "=== Codex Enforcer Hook Installer ==="
-
-# 1. Check if the hook script exists
-if [ ! -f "$HOOK_SCRIPT" ]; then
-    echo "Error: Hook script not found at $HOOK_SCRIPT"
+case "$TARGET" in
+  codex)
+    OUTPUT_PATH="$PROJECT_ROOT/hooks/hooks.json"
+    ;;
+  gemini)
+    OUTPUT_PATH="$PROJECT_ROOT/.gemini/settings.json"
+    ;;
+  antigravity)
+    OUTPUT_PATH="$PROJECT_ROOT/.agents/hooks.json"
+    ;;
+  claude)
+    OUTPUT_PATH="$PROJECT_ROOT/.claude/settings.json"
+    ;;
+  universal|all-agents)
+    OUTPUT_PATH=""
+    ;;
+  *)
+    echo "Unsupported target: $TARGET"
     exit 1
+    ;;
+esac
+
+echo "=== Codex Workflows Installer ==="
+echo "Target: $TARGET"
+echo "Profile: $PROFILE"
+if [ -n "$OUTPUT_PATH" ]; then
+  echo "Output: $OUTPUT_PATH"
+else
+  echo "Output: (shared assets only)"
 fi
 
-# 2. Make hook script executable
-echo "Making hook script executable..."
-chmod +x "$HOOK_SCRIPT"
+cd "$PROJECT_ROOT"
+if [ -n "$OUTPUT_PATH" ]; then
+  python3 -m scripts.installer.cli --target "$TARGET" --profile "$PROFILE" --output "$OUTPUT_PATH"
+else
+  python3 -m scripts.installer.cli --target "$TARGET" --profile "$PROFILE"
+fi
 
-# 3. Ensure target config directory exists
-echo "Ensuring config directory exists at $CONFIG_DIR..."
-mkdir -p "$CONFIG_DIR"
-
-# 4. Generate hooks.json pointing to the absolute path
-echo "Writing hooks.json configuration..."
-cat << EOF > "$HOOKS_JSON"
-{
-  "codex-enforcer": {
-    "enabled": true,
-    "PreToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOOK_SCRIPT",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-EOF
-
-echo "Hooks registered successfully at $HOOKS_JSON"
 echo "Setup complete!"

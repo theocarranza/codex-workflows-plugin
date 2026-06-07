@@ -1,0 +1,8 @@
+{
+  "toolCall": {
+    "name": "run_command",
+    "args": {
+      "CommandLine": "mv /workspace/project/AI_Codex/Tickets/Active/task-123.md /workspace/project/AI_Codex/Tickets/Closed/task-123.md"
+    }
+  }
+}
