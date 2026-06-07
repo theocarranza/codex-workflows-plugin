@@ -75,6 +75,81 @@ def has_active_session_today(vault_dir):
 
     return False
 
+def check_youtrack_state_in_transcript(transcript_path, issue_id, expected_states):
+    if not transcript_path or not os.path.exists(transcript_path):
+        log_debug(f"Transcript path '{transcript_path}' not found.")
+        return False
+
+    try:
+        with open(transcript_path, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    step = json.loads(line)
+                    if step.get("status") != "DONE":
+                        continue
+                    
+                    tool_calls = step.get("tool_calls") or []
+                    for tc in tool_calls:
+                        if tc.get("name") == "call_mcp_tool":
+                            args = tc.get("args") or {}
+                            server = args.get("ServerName") or ""
+                            tool = args.get("ToolName") or ""
+                            
+                            server = server.strip('"\'')
+                            tool = tool.strip('"\'')
+                            
+                            if server == "youtrack" and tool == "update_issue":
+                                tc_args_str = args.get("Arguments") or "{}"
+                                if isinstance(tc_args_str, str):
+                                    try:
+                                        tc_args = json.loads(tc_args_str)
+                                    except:
+                                        tc_args = {}
+                                else:
+                                    tc_args = tc_args_str
+                                
+                                tid = tc_args.get("issueId") or ""
+                                custom_fields = tc_args.get("customFields") or {}
+                                state = custom_fields.get("State") or ""
+                                
+                                tid = str(tid).strip('"\'')
+                                state = str(state).strip('"\'')
+                                
+                                if tid == issue_id and state in expected_states:
+                                    log_debug(f"Found matching YouTrack update: {issue_id} -> {state}")
+                                    return True
+                except Exception:
+                    pass
+    except Exception as e:
+        log_debug(f"Error reading transcript: {e}")
+
+    return False
+
+def get_youtrack_issue_id_from_ticket(filepath):
+    if not filepath or not os.path.exists(filepath):
+        return None
+    try:
+        with open(filepath, "r") as f:
+            content = f.read()
+        match = re.search(r"^youtrack:\s*(SEUMEI-\d+|[A-Z]+-\d+)", content, re.MULTILINE)
+        if match:
+            return match.group(1)
+    except Exception as e:
+        log_debug(f"Error reading ticket frontmatter: {e}")
+    return None
+
+def get_youtrack_issue_id_from_write(file_path, arguments):
+    code_content = arguments.get("CodeContent") or ""
+    if code_content:
+        match = re.search(r"^youtrack:\s*(SEUMEI-\d+|[A-Z]+-\d+)", code_content, re.MULTILINE)
+        if match:
+            return match.group(1)
+    if os.path.exists(file_path):
+        return get_youtrack_issue_id_from_ticket(file_path)
+    return None
+
 def install_hook():
     script_path = os.path.abspath(__file__)
     # The skill's root is two levels up from the script
@@ -187,6 +262,16 @@ def main():
                     log_debug(f"DENIED: {reason}")
                     print(json.dumps({"permissionDecision": "deny", "reason": reason}))
                     sys.exit(0)
+                
+                # Check YouTrack status for starting ticket
+                issue_id = get_youtrack_issue_id_from_ticket(abs_src)
+                if issue_id:
+                    transcript_path = input_data.get("transcriptPath")
+                    if not check_youtrack_state_in_transcript(transcript_path, issue_id, ["In Progress"]):
+                        reason = f"Move blocked. You must update YouTrack issue {issue_id} state to 'In Progress' via call_mcp_tool before moving the ticket to Active."
+                        log_debug(f"DENIED: {reason}")
+                        print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                        sys.exit(0)
             elif "Tickets/Active/" in abs_src:
                 is_bugfix = "bug" in os.path.basename(abs_src).lower()
                 if os.path.exists(abs_src):
@@ -207,6 +292,17 @@ def main():
                 else:
                     if "Tickets/Closed/" not in abs_dst:
                         reason = f"Feature/Task ticket {os.path.basename(abs_src)} must be moved to Tickets/Closed/, not {os.path.basename(abs_dst)}."
+                        log_debug(f"DENIED: {reason}")
+                        print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                        sys.exit(0)
+
+                # Check YouTrack status for closing/resolving ticket
+                issue_id = get_youtrack_issue_id_from_ticket(abs_src)
+                if issue_id:
+                    transcript_path = input_data.get("transcriptPath")
+                    allowed_end_states = ["Done", "Fixed", "Test", "Testing", "Resolved"]
+                    if not check_youtrack_state_in_transcript(transcript_path, issue_id, allowed_end_states):
+                        reason = f"Move blocked. You must update YouTrack issue {issue_id} state to 'Done', 'Fixed', or 'Test'/'Testing'/'Resolved' via call_mcp_tool before moving the ticket to Resolved/Closed."
                         log_debug(f"DENIED: {reason}")
                         print(json.dumps({"permissionDecision": "deny", "reason": reason}))
                         sys.exit(0)
@@ -239,6 +335,23 @@ def main():
                 log_debug(f"DENIED: {reason}")
                 print(json.dumps({"permissionDecision": "deny", "reason": reason}))
                 sys.exit(0)
+
+            # Check YouTrack status when writing active/closed/resolved tickets
+            if "Tickets/Active/" in abs_file_path or "Tickets/Closed/" in abs_file_path or "Tickets/Resolved/" in abs_file_path:
+                issue_id = get_youtrack_issue_id_from_write(abs_file_path, arguments)
+                if issue_id:
+                    transcript_path = input_data.get("transcriptPath")
+                    if "Tickets/Active/" in abs_file_path:
+                        expected_states = ["In Progress"]
+                        state_desc = "'In Progress'"
+                    else:
+                        expected_states = ["Done", "Fixed", "Test", "Testing", "Resolved"]
+                        state_desc = "'Done', 'Fixed', or 'Test'/'Testing'/'Resolved'"
+                    if not check_youtrack_state_in_transcript(transcript_path, issue_id, expected_states):
+                        reason = f"Write blocked. You must update YouTrack issue {issue_id} state to {state_desc} via call_mcp_tool before saving/moving the ticket."
+                        log_debug(f"DENIED: {reason}")
+                        print(json.dumps({"permissionDecision": "deny", "reason": reason}))
+                        sys.exit(0)
 
         if not is_allowed_markdown(file_path, vault_dir, project_root) or "Agent_Sessions" not in file_path:
             if not has_active_session_today(vault_dir):

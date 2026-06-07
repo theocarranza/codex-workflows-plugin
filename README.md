@@ -42,6 +42,9 @@ The plugin installs a custom `PreToolUse` hook script (`codex_enforce_hook.py`) 
   - Blocks resolving bugfix tickets if they are not moved to `Resolved/`.
   - Blocks resolving tasks/features if they are not moved to `Closed/`.
   - Restricts direct write operations (`write_to_file`) to ensure task/feature tickets are never written to `Resolved/` and bugfix tickets are never written to `Closed/`.
+* **YouTrack State Verification**:
+  - Enforces that the corresponding YouTrack card has been updated to 'In Progress' before a ticket can be started (moved or saved to `Active/`).
+  - Enforces that the YouTrack card has been updated to 'Done', 'Fixed', or 'Test'/'Testing'/'Resolved' before a ticket can be completed (moved or saved to `Closed/` or `Resolved/`).
 
 ---
 

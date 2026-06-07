@@ -197,5 +197,99 @@ class TestCodexEnforceHook(unittest.TestCase):
         self.assertEqual(res["permissionDecision"], "deny")
         self.assertIn("Bugfix tickets cannot be written to Tickets/Closed/", res["reason"])
 
+    def create_mock_transcript(self, issue_id, state):
+        transcript_file = os.path.join(self.test_dir, "mock_transcript.jsonl")
+        step = {
+            "status": "DONE",
+            "tool_calls": [
+                {
+                    "name": "call_mcp_tool",
+                    "args": {
+                        "ServerName": "youtrack",
+                        "ToolName": "update_issue",
+                        "Arguments": json.dumps({
+                            "issueId": issue_id,
+                            "customFields": {"State": state}
+                        })
+                    }
+                }
+            ]
+        }
+        with open(transcript_file, "w") as f:
+            f.write(json.dumps(step) + "\n")
+        return transcript_file
+
+    def test_deny_write_active_without_youtrack_update(self):
+        # Create ticket content with YouTrack ID
+        content = "---\nyoutrack: SEUMEI-501\ntype: task\nstatus: active\n---"
+        stdin = {
+            "name": "write_to_file",
+            "arguments": {
+                "TargetFile": f"{self.vault_dir}/Tickets/Active/task-123.md",
+                "CodeContent": content
+            },
+            "transcriptPath": os.path.join(self.test_dir, "nonexistent.jsonl")
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("You must update YouTrack issue", res["reason"])
+
+    def test_allow_write_active_with_youtrack_update(self):
+        # Create an active session file for today to pass session check
+        sessions_dir = os.path.join(self.vault_dir, "Agent_Sessions")
+        os.makedirs(sessions_dir, exist_ok=True)
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        session_file = os.path.join(sessions_dir, f"{today_str}-120000-session.md")
+        with open(session_file, "w") as f:
+            f.write("---\nnext: null\n---")
+
+        transcript_path = self.create_mock_transcript("SEUMEI-501", "In Progress")
+        content = "---\nyoutrack: SEUMEI-501\ntype: task\nstatus: active\n---"
+        stdin = {
+            "name": "write_to_file",
+            "arguments": {
+                "TargetFile": f"{self.vault_dir}/Tickets/Active/task-123.md",
+                "CodeContent": content
+            },
+            "transcriptPath": transcript_path
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "allow")
+
+    def test_deny_write_closed_without_youtrack_done(self):
+        content = "---\nyoutrack: SEUMEI-501\ntype: task\nstatus: closed\n---"
+        stdin = {
+            "name": "write_to_file",
+            "arguments": {
+                "TargetFile": f"{self.vault_dir}/Tickets/Closed/task-123.md",
+                "CodeContent": content
+            },
+            "transcriptPath": os.path.join(self.test_dir, "nonexistent.jsonl")
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("You must update YouTrack issue", res["reason"])
+
+    def test_allow_write_closed_with_youtrack_done(self):
+        sessions_dir = os.path.join(self.vault_dir, "Agent_Sessions")
+        os.makedirs(sessions_dir, exist_ok=True)
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        session_file = os.path.join(sessions_dir, f"{today_str}-120000-session.md")
+        with open(session_file, "w") as f:
+            f.write("---\nnext: null\n---")
+
+        transcript_path = self.create_mock_transcript("SEUMEI-501", "Done")
+        content = "---\nyoutrack: SEUMEI-501\ntype: task\nstatus: closed\n---"
+        stdin = {
+            "name": "write_to_file",
+            "arguments": {
+                "TargetFile": f"{self.vault_dir}/Tickets/Closed/task-123.md",
+                "CodeContent": content
+            },
+            "transcriptPath": transcript_path
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "allow")
+
 if __name__ == "__main__":
     unittest.main()
