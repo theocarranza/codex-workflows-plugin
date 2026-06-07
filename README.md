@@ -18,6 +18,7 @@ To ensure that autonomous agents consistently follow strict repository governanc
 - Shared workflows and rules stay in `skills/codex_workflows/`.
 - Repository-local migration tracking lives in `AI_Codex/`.
 - Focused migration skills live in `skills/bootstrap/`, `skills/start-ticket/`, `skills/resolve-ticket/`, `skills/repository-sync/`, `skills/commit-prep/`, and `skills/automated-tests/`.
+- Release artifacts are built with `scripts/release_packager.py`, which emits a versioned zip from the current plugin layout.
 
 ---
 

@@ -18,6 +18,7 @@ from scripts.adapters import (
     parse_codex_payload,
     parse_gemini_payload,
 )
+from scripts.payload_capture import capture_hook_payload
 from scripts.ticket_runtime import (
     check_youtrack_state_in_transcript,
     extract_ticket_paths,
@@ -116,6 +117,17 @@ def emit_decision(client: str, decision: PolicyDecision) -> None:
 def run(client: str, input_data: dict[str, Any]) -> int:
     project_root = get_project_root()
     vault_dir = get_vault_dir(project_root)
+    capture_dir = os.environ.get("CODEX_WORKFLOW_CAPTURE_DIR")
+    if capture_dir:
+        try:
+            capture_hook_payload(
+                client=client,
+                payload=input_data,
+                capture_dir=capture_dir,
+                project_root=project_root,
+            )
+        except Exception as exc:
+            log_debug(f"Capture skipped: {exc}")
     parser, _ = select_adapter(client)
     codex_event = parser(input_data, project_root=project_root, vault_dir=vault_dir)
     tool_name = codex_event.tool_name

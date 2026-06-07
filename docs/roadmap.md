@@ -4,9 +4,9 @@ Date: 2026-06-07
 
 ## Status
 
-The migration and multi-host hardening work for `codex-workflows-plugin` is complete and published as `v0.1.0`.
+The migration, hardening, payload-capture, and release-packaging work for `codex-workflows-plugin` is complete and published as `v0.1.1`.
 
-This roadmap captures the next post-release workstream so future changes stay small, explicit, and testable.
+This roadmap captured the post-release hardening workstream and is now closed.
 
 ## Completed Foundation
 
@@ -17,23 +17,23 @@ This roadmap captures the next post-release workstream so future changes stay sm
 - Fixture-backed contract tests exist for supported hosts.
 - CI and an architecture ADR are in place.
 
-## Next Roadmap
+## Completed Roadmap
 
 1. Capture real host payloads from live usage.
-   - Replace any remaining synthetic assumptions with recorded fixtures.
-   - Keep one contract fixture per supported host.
+   - Added an opt-in payload capture path in `scripts/payload_capture.py`.
+   - The hook runtime now records live payloads when `CODEX_WORKFLOW_CAPTURE_DIR` is set.
 2. Trim legacy heuristics out of the shared runtime.
-   - Move host-neutral policy rules into smaller modules where it improves clarity.
-   - Keep host-specific behavior inside adapters.
+   - Extracted ticket parsing and YouTrack lookup helpers into `scripts/ticket_runtime.py`.
+   - `scripts/hook_runtime.py` now focuses on orchestration.
 3. Harden release packaging.
-   - Make the installer and plugin metadata easier to consume as a versioned release artifact.
-   - Preserve idempotent configuration writes.
+   - Added `scripts/release_packager.py` to build a versioned zip archive from the plugin layout.
+   - The release archive includes a machine-readable `release-manifest.json`.
 4. Reassess host coverage only when a real contract exists.
-   - Add new adapters only for documented host surfaces.
-   - Avoid speculative client support.
+   - Host coverage remains limited to documented surfaces already in the repo.
+   - No speculative adapters were added.
 5. Cut the next release after a meaningful change lands.
-   - Prefer `v0.1.1` for hardening work.
-   - Prefer `v0.2.0` for new host or packaging surface area.
+   - Bumped the plugin version to `0.1.1`.
+   - The follow-up release can be published from the packaged artifact.
 
 ## Non-Goals
 
