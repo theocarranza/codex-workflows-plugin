@@ -15,7 +15,7 @@ When we are done with a ticket, we execute the following workflow:
 - [ ] Task 8. Repeat steps 1, 2, and 3 when all comments selected for implementation are satisfied
 - [ ] Task 9. Merge the pull request
 - [ ] Task 10. Move the corresponding YouTrack card to "done"
-- [ ] Task 11. Update the ledger ticket and agent session
+- [ ] Task 11. Update the ledger ticket (including Tasks and Walkthrough sections with the saved artifacts) and agent session
 - [ ] Task 12. Checkout the local `unstable` branch and pull from origin to sync it
 
 ## 3. Technical Constraints

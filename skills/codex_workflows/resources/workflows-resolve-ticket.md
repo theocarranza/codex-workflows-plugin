@@ -37,7 +37,7 @@ This workflow defines the step-by-step procedure when done with a ticket to ensu
 2. **Update Codex Ledger & Session**:
    - Move the ledger ticket file from `AI_Codex_SeuMeiSimples/Tickets/Active/` to `AI_Codex_SeuMeiSimples/Tickets/Resolved/`.
    - Update the ledger ticket YAML frontmatter `status` to `resolved`.
-   - Document key changes, tech debt, and final considerations in the ledger ticket walkthrough.
+   - Append the `Tasks` and `Walkthrough` sections directly to the ledger ticket, saving both the `task.md` and `walkthrough.md` artifacts contents inside it (under `## Tasks` and `## Walkthrough` respectively).
    - Close the current session file in `Agent_Sessions` and update links.
 3. **Sync Local Workspace**: Checkout the local `unstable` branch and pull the latest changes from origin:
    ```bash
