@@ -7,13 +7,35 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased] — v0.2.0-dev
+## [Unreleased]
 
-### Planned
-- Wire `WorkspaceProfile` from `scripts/profiles/` into `hook_runtime.py` and installer CLI so a single `--profile` flag controls all runtime behaviour.
-- Installer `--all-agents` target: install for all supported hosts in one pass.
-- Configurable ticket folder names (currently hard-coded as `Ready/Active/Closed/Resolved`).
-- Support for GitLab issue tracker alongside YouTrack.
+_(nothing yet)_
+
+---
+
+## [0.2.0] — 2026-06-07
+
+### Added
+- `sync_shared_assets(dest_root)` in `installer/cli.py`: copies `.agent/workflows/*.md` and `.agent/rules/*.md` to the destination project.
+- `write_target_config(merged_config, config_path, dest_root)` in `installer/cli.py`: writes merged hook JSON at the correct relative config path.
+- `--dest` flag on `scripts.installer.cli`: triggers real filesystem writes (hook config + shared asset sync) when provided.
+- `YouTrackCheckResult` dataclass in `ticket_runtime.py`: structured return from transcript scanner with `reason` field (`ok` | `transcript_missing` | `state_not_found`).
+- `CHANGELOG.md`.
+
+### Changed
+- Session-gate denial messages now use the dynamically resolved vault directory name — no project-specific strings remain in the runtime.
+- `check_youtrack_state_in_transcript` returns `YouTrackCheckResult` instead of `bool`; denial messages now include the reason.
+- `infer_is_bugfix_ticket` uses frontmatter-only inference — filename heuristic removed.
+- README rewritten to reflect current architecture, correct installer CLI, test count, and release instructions.
+- `plugin.json` author corrected from `"OpenAI"` to `"agentrick"`.
+- `scripts/profiles/base.py` documented as v0.3 scaffolding.
+
+### Fixed
+- Portability: project-specific vault name no longer leaks into error messages delivered to other projects.
+- Installer gap: `--dest` now delivers what the README promised.
+- Bugfix false-positive: `debug-something.md` no longer routed to `Resolved/`.
+
+> **Roadmap for v0.3**: wire `WorkspaceProfile` into `hook_runtime.py` and installer CLI; `--all-agents` target; configurable ticket folder names; GitLab tracker support.
 
 ---
 

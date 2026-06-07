@@ -1,84 +1,120 @@
 # AI Codex Workflows Plugin
 
-A workspace automation plugin that registers git and tool hooks, enforces session bootstrapping, and mandates ticket lifecycle folder movements across the AI Codex vault.
+A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, and YouTrack state gating across agent-driven development workflows.
 
-This repository is being migrated toward a real Codex plugin with a shared policy core, host adapters, and client-targeted installation profiles. The current implementation is still a legacy hook bundle, so the migration keeps packaging, policy, and installer concerns separate.
+> **v0.2.0** — Fully portable. The installer now writes hook configs and syncs workflow/rules assets to target projects in a single command. No project-specific names are hard-coded anywhere in the runtime.
 
 ## Purpose
 
 To ensure that autonomous agents consistently follow strict repository governance protocols:
-1. **Mandatory Session Bootstrap**: Initializing today's session record before editing files.
-2. **Commit Pipeline Verification**: Running pre-merge checks (`ensure-can-merge`) before commits/PRs.
-3. **Structured Ticket Progression**: Validating and gating ticket status folder transitions, YouTrack moves, and code verification.
+1. **Mandatory Session Bootstrap**: Blocks all codebase writes until today's session record is initialized in the vault.
+2. **Structured Ticket Progression**: Validates and gates ticket folder transitions (`Ready -> Active -> Closed/Resolved`), enforcing YouTrack state synchronization at each step.
+3. **Destructive-Op Guard**: Prevents `rm`/`rmdir` against the Codex vault — status transitions must always be expressed as file moves.
+
+## Architecture
+
+```
+scripts/
+├── hook_runtime.py       # Entry point — orchestrates all policy checks
+├── ticket_runtime.py     # Path extraction, YouTrack transcript scanner, bugfix inference
+├── policy/               # Pure policy engine (engine.py + events.py) — no I/O
+├── adapters/             # 4 host adapters: codex, gemini, claude, antigravity
+├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py)
+└── profiles/             # Workspace profiles (v0.2 scaffolding — not yet wired into runtime)
+skills/                   # 7 skill folders consumed by agent hosts
+.agent/workflows/         # 11 workflow guides synced to target projects on install
+.agent/rules/             # 27 coding & governance rule files synced to target projects
+```
 
 ## Packaging Boundary
 
-- Codex plugin metadata lives in `.codex-plugin/plugin.json`.
-- Lifecycle hook wiring lives in `hooks/hooks.json`.
-- Shared workflows and rules stay in `skills/codex_workflows/`.
-- Repository-local migration tracking lives in `AI_Codex/`.
-- Focused migration skills live in `skills/bootstrap/`, `skills/start-ticket/`, `skills/resolve-ticket/`, `skills/repository-sync/`, `skills/commit-prep/`, and `skills/automated-tests/`.
-- Release artifacts are built with `scripts/release_packager.py`, which emits a versioned zip from the current plugin layout.
+- Plugin metadata: `.codex-plugin/plugin.json`
+- Codex host wiring: `hooks/hooks.json`
+- Shared skill bundles: `skills/`
+- Release packager: `scripts/release_packager.py` emits `dist/codex-workflows-plugin-<version>.zip`
 
 ---
 
-## 🗂️ Ticket Lifecycle & Status Folders
+## Ticket Lifecycle & Status Folders
 
-Tickets are tracked as Markdown files inside the `AI_Codex/Projects/<project_name>/Tickets/` directory and progress through the following states:
+Tickets live in `<vault>/Tickets/` and progress through four states:
 
-1. **`Ready/` (Backlog / Groomed)**
-   - Tickets that are groomed and ready for implementation.
-   - Status represents that a ticket can be picked up.
-2. **`Active/` (In Progress)**
-   - When a ticket starts, it is moved from `Ready/` to `Active/` by `/start-ticket`.
-   - The ticket YAML frontmatter `status` must be set to `active`.
-3. **`Resolved/` (Completed Bugfixes)**
-   - If a ticket is a **bugfix**, it is moved from `Active/` to `Resolved/` upon resolution.
-   - The ticket YAML frontmatter `status` must be updated to `resolved`.
-4. **`Closed/` (Completed Tasks & Features)**
-   - If a ticket is a **feature** or standard **task**, it is moved from `Active/` to `Closed/` upon completion.
-   - The ticket YAML frontmatter `status` must be updated to `closed`.
+| Folder | Status | Transition |
+|---|---|---|
+| `Ready/` | Groomed, pickable | — |
+| `Active/` | In progress | `/start-ticket` moves from `Ready/` |
+| `Closed/` | Feature/task complete | Moved from `Active/` on completion |
+| `Resolved/` | Bugfix complete | Moved from `Active/` on resolution |
+
+**Bugfix detection** reads `type: bug` or `type: bugfix` from YAML frontmatter exclusively. Filename heuristics are intentionally excluded to avoid false positives (e.g. `debug-something.md`).
 
 ---
 
-## ⚙️ Enforced Rules & Hooks
+## Enforced Rules & Hooks
 
-The plugin installs a custom `PreToolUse` hook script (`codex_enforce_hook.py`) that intercepts agent operations:
+The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every agent tool call:
 
-* **No Destructive Deletions**: Restricts using destructive command-line utilities (like `rm` or `rmdir`) within the Codex vault. Status transitions must always be done via file moves.
-* **Markdown Allowlist**: Restricts file modifications only to files specified in the workspace allowlist (e.g. `CLAUDE.md`, `GEMINI.md`, and directories under `.agent/` or the vault).
-* **Mandatory Session Bootstrapping**: Blocks all write tools from modifying codebase files unless today's agent session log has been initialized.
-* **Ticket Status & Destination Validation**:
-  - Blocks starting tickets unless they are moved from `Ready/` to `Active/`.
-  - Blocks resolving bugfix tickets if they are not moved to `Resolved/`.
-  - Blocks resolving tasks/features if they are not moved to `Closed/`.
-  - Restricts direct write operations (`write_to_file`) to ensure task/feature tickets are never written to `Resolved/` and bugfix tickets are never written to `Closed/`.
-* **YouTrack State Verification**:
-  - Enforces that the corresponding YouTrack card has been updated to 'In Progress' before a ticket can be started (moved or saved to `Active/`).
-  - Enforces that the YouTrack card has been updated to 'Done', 'Fixed', or 'Test'/'Testing'/'Resolved' before a ticket can be completed (moved or saved to `Closed/` or `Resolved/`).
+* **No Destructive Deletions**: `rm`/`rmdir` against vault paths are denied.
+* **Markdown Allowlist**: Only `CLAUDE.md`, `GEMINI.md`, `.agent/`, and the vault may be written.
+* **Mandatory Session Bootstrapping**: Write tools are blocked until `<vault>/Agent_Sessions/YYYY-MM-DD*.md` exists (with `next: null` frontmatter). Error messages include the actual vault directory name — no project names are hard-coded.
+* **Ticket Destination Validation**: Wrong folder for the ticket type is denied with a specific reason message.
+* **YouTrack State Verification**: Scans the JSONL conversation transcript for a completed `call_mcp_tool(youtrack/update_issue)` call. Denial messages distinguish between:
+  - `transcript_missing` — transcript path was absent from the hook payload
+  - `state_not_found` — transcript present but the required state was not recorded
 
 ---
 
-## 🛠️ Installation & Syncing
+## Installation
 
-To sync rules and install hooks into a project:
-1. Ensure the workspace has a `.agent/workflows/` and `.agent/rules/` structure.
-2. Execute the install script or run the hook script with the `install` argument:
-   ```bash
-   python3 skills/codex_workflows/scripts/codex_enforce_hook.py --install
-   ```
-   This will:
-   - Make the hook script executable.
-   - Register Codex hooks in `hooks/hooks.json`.
-   - Synchronize reference workflows to the project's `.agent/workflows/` directory.
-   - Synchronize coding rules to the project's `.agent/rules/` directory.
+Run from the plugin's repository root, pointing `--dest` at your target project:
+
+```bash
+# Antigravity: writes .agents/hooks.json + syncs .agent/workflows/ and .agent/rules/
+python3 -m scripts.installer.cli --target antigravity --dest /path/to/your/project
+
+# Gemini: writes .gemini/settings.json + syncs shared assets
+python3 -m scripts.installer.cli --target gemini --dest /path/to/your/project
+
+# Claude: writes .claude/settings.json + syncs shared assets
+python3 -m scripts.installer.cli --target claude --dest /path/to/your/project
+
+# Codex: writes hooks/hooks.json + syncs shared assets
+python3 -m scripts.installer.cli --target codex --dest /path/to/your/project
+
+# Dry-run: print merged config without writing anything
+python3 -m scripts.installer.cli --target gemini --output /tmp/preview.json
+```
 
 ### Host Targets
 
-The installer now targets the actual host surface:
+| Target | Config Path | Hook Event |
+|---|---|---|
+| `codex` | `hooks/hooks.json` | `PreToolUse` |
+| `gemini` | `.gemini/settings.json` | `BeforeTool` |
+| `antigravity` | `.agents/hooks.json` | `PreToolUse` |
+| `claude` | `.claude/settings.json` | `PreToolUse` |
+| `universal` | _(shared assets only)_ | — |
 
-- `codex` writes `hooks/hooks.json`
-- `gemini` writes `.gemini/settings.json`
-- `antigravity` writes `.agents/hooks.json`
-- `claude` writes `.claude/settings.json`
-- `universal` installs only shared assets
+All targets also sync `.agent/workflows/*.md` and `.agent/rules/*.md` into the destination project. Existing hook configs are merged non-destructively.
+
+---
+
+## Tests
+
+```bash
+python3 -m unittest discover -s test -p "test_*.py" -v
+```
+
+**48 tests**, all passing. Coverage spans: policy engine, all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, bugfix frontmatter inference), installer (dry-run and live `--dest` write), profiles, and release packager.
+
+---
+
+## Release
+
+```bash
+python3 -m scripts.release_packager --output-dir dist/
+```
+
+Emits `dist/codex-workflows-plugin-<version>.zip`. Version is read from `.codex-plugin/plugin.json`. The archive includes plugin metadata, hooks, skills, scripts, and docs — `__pycache__` and test directories are excluded.
+
+See [CHANGELOG.md](./CHANGELOG.md) for full version history.
