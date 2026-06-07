@@ -2,7 +2,7 @@
 timestamp: 2026-06-07T08:36:39-03:00
 project: codex-workflows-plugin
 branch: master
-status: active
+status: closed
 type: task
 tags: [codex-workflows-plugin, migration, plugin, model-agnostic]
 ---
@@ -160,3 +160,7 @@ Establish the repository-local Codex ledger that will govern the migration to a 
 - Cleaned generated `__pycache__` directories from the worktree.
 - Added the host adapter architecture ADR at `docs/adr/2026-06-07-host-adapter-architecture.md`.
 - Verified the full Python test suite now passes with 48 tests total, plugin validation still passes, and the installer smoke tests succeed for all supported host targets.
+
+## Closure
+
+- The plugin migration and host-hardening work is complete and ready for release/tagging.
