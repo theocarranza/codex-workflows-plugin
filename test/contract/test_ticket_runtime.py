@@ -110,6 +110,90 @@ class TestYouTrackTranscriptCheck(unittest.TestCase):
         self.assertTrue(result.verified)
         self.assertEqual(result.reason, "ok")
 
+    def test_returns_timer_incorrect_when_timer_does_not_match(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            transcript_path = self._write_transcript(tmpdir, [
+                {
+                    "status": "DONE",
+                    "tool_calls": [
+                        {
+                            "name": "call_mcp_tool",
+                            "args": {
+                                "ServerName": "youtrack",
+                                "ToolName": "update_issue",
+                                "Arguments": json.dumps({
+                                    "issueId": "SEUMEI-42",
+                                    "customFields": {"State": "In Progress", "Timer": "Stop"},
+                                }),
+                            },
+                        }
+                    ],
+                }
+            ])
+
+            result = check_youtrack_state_in_transcript(
+                transcript_path, "SEUMEI-42", ["In Progress"], expected_timer="Start"
+            )
+
+        self.assertFalse(result.verified)
+        self.assertEqual(result.reason, "timer_incorrect")
+
+    def test_returns_spent_time_missing_when_required_but_absent(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            transcript_path = self._write_transcript(tmpdir, [
+                {
+                    "status": "DONE",
+                    "tool_calls": [
+                        {
+                            "name": "call_mcp_tool",
+                            "args": {
+                                "ServerName": "youtrack",
+                                "ToolName": "update_issue",
+                                "Arguments": json.dumps({
+                                    "issueId": "SEUMEI-42",
+                                    "customFields": {"State": "Done", "Timer": "Stop"},
+                                }),
+                            },
+                        }
+                    ],
+                }
+            ])
+
+            result = check_youtrack_state_in_transcript(
+                transcript_path, "SEUMEI-42", ["Done"], expected_timer="Stop", require_spent_time=True
+            )
+
+        self.assertFalse(result.verified)
+        self.assertEqual(result.reason, "spent_time_missing")
+
+    def test_returns_ok_when_timer_and_spent_time_match_and_exist(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            transcript_path = self._write_transcript(tmpdir, [
+                {
+                    "status": "DONE",
+                    "tool_calls": [
+                        {
+                            "name": "call_mcp_tool",
+                            "args": {
+                                "ServerName": "youtrack",
+                                "ToolName": "update_issue",
+                                "Arguments": json.dumps({
+                                    "issueId": "SEUMEI-42",
+                                    "customFields": {"State": "Done", "Timer": "Stop", "Spent time": "3h 30m"},
+                                }),
+                            },
+                        }
+                    ],
+                }
+            ])
+
+            result = check_youtrack_state_in_transcript(
+                transcript_path, "SEUMEI-42", ["Done"], expected_timer="Stop", require_spent_time=True
+            )
+
+        self.assertTrue(result.verified)
+        self.assertEqual(result.reason, "ok")
+
 
 class TestYouTrackIssueIdFromTicket(unittest.TestCase):
     def test_extracts_youtrack_issue_id_from_ticket_frontmatter(self):

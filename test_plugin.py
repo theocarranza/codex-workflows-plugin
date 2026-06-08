@@ -213,8 +213,13 @@ class TestCodexEnforceHook(unittest.TestCase):
         self.assertIn("interface", manifest)
         self.assertNotIn("hooks", manifest)
 
-    def create_mock_transcript(self, issue_id, state):
+    def create_mock_transcript(self, issue_id, state, timer=None, spent_time=None):
         transcript_file = os.path.join(self.test_dir, "mock_transcript.jsonl")
+        custom_fields = {"State": state}
+        if timer is not None:
+            custom_fields["Timer"] = timer
+        if spent_time is not None:
+            custom_fields["Spent time"] = spent_time
         step = {
             "status": "DONE",
             "tool_calls": [
@@ -225,7 +230,7 @@ class TestCodexEnforceHook(unittest.TestCase):
                         "ToolName": "update_issue",
                         "Arguments": json.dumps({
                             "issueId": issue_id,
-                            "customFields": {"State": state}
+                            "customFields": custom_fields
                         })
                     }
                 }
@@ -259,7 +264,7 @@ class TestCodexEnforceHook(unittest.TestCase):
         with open(session_file, "w") as f:
             f.write("---\nnext: null\n---")
 
-        transcript_path = self.create_mock_transcript("SEUMEI-501", "In Progress")
+        transcript_path = self.create_mock_transcript("SEUMEI-501", "In Progress", timer="Start")
         content = "---\nyoutrack: SEUMEI-501\ntype: task\nstatus: active\n---"
         stdin = {
             "name": "write_to_file",
@@ -294,7 +299,7 @@ class TestCodexEnforceHook(unittest.TestCase):
         with open(session_file, "w") as f:
             f.write("---\nnext: null\n---")
 
-        transcript_path = self.create_mock_transcript("SEUMEI-501", "Done")
+        transcript_path = self.create_mock_transcript("SEUMEI-501", "Done", timer="Stop", spent_time="2h")
         content = "---\nyoutrack: SEUMEI-501\ntype: task\nstatus: closed\n---"
         stdin = {
             "name": "write_to_file",
