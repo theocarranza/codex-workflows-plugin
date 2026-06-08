@@ -13,6 +13,24 @@ _(nothing yet)_
 
 ---
 
+## [0.2.1] — 2026-06-08
+
+### Added
+- Timer and Spent time verification to the pre-tool Hook (`check_youtrack_state_in_transcript` in `ticket_runtime.py`):
+  - Active tickets must have `Timer: "Start"` and `State: "In Progress"`.
+  - Finished (Resolved/Closed) tickets must have `Timer: "Stop"`, `State: "Done"` or `"Fixed"`, and a non-empty `Spent time` value.
+- Unit/contract tests for Timer and Spent time verification (3 new tests, total of 51 tests).
+
+### Changed
+- Bypassed the YouTrack testing lane for the current effort, allowing and expecting finished tickets to move straight to `Done` or `Fixed` (removing `Test`/`Testing`/`Resolved` from allowed finished states in hook validation).
+- Updated workflows (`workflows-start-ticket.md`, `workflows-ai-codex-finish-ticket.md`, and `workflows-resolve-ticket.md`) to instruct agents on starting the timer, filling Story points, stopping the timer, logging spent time, and bypassing the testing lane.
+- Auto-update block conditional in `hook_runtime.py` corrected to trigger when moving a ticket from `Ready` to `Active` (fixed typo `"Tickets/Active/" not in abs_dst` to `in abs_dst`).
+
+### Fixed
+- Workflow cycle execution gap: fixed pre-tool hooks to actively verify YouTrack timer start/stop and spent time logging.
+
+---
+
 ## [0.2.0] — 2026-06-07
 
 ### Added

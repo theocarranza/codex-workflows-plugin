@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, and YouTrack state gating across agent-driven development workflows.
 
-> **v0.2.0** — Fully portable. The installer now writes hook configs and syncs workflow/rules assets to target projects in a single command. No project-specific names are hard-coded anywhere in the runtime.
+> **v0.2.1** — Enforces YouTrack timer start/stop, spent time logging, and bypasses the testing lane straight to Done/Fixed. No project-specific names are hard-coded anywhere in the runtime.
 
 ## Purpose
 
@@ -58,9 +58,9 @@ The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every age
 * **Markdown Allowlist**: Only `CLAUDE.md`, `GEMINI.md`, `.agent/`, and the vault may be written.
 * **Mandatory Session Bootstrapping**: Write tools are blocked until `<vault>/Agent_Sessions/YYYY-MM-DD*.md` exists (with `next: null` frontmatter). Error messages include the actual vault directory name — no project names are hard-coded.
 * **Ticket Destination Validation**: Wrong folder for the ticket type is denied with a specific reason message.
-* **YouTrack State Verification**: Scans the JSONL conversation transcript for a completed `call_mcp_tool(youtrack/update_issue)` call. Denial messages distinguish between:
+* **YouTrack State Verification**: Scans the JSONL conversation transcript for a completed `call_mcp_tool(youtrack/update_issue)` call. Enforces that: (a) starting tickets requires `State: In Progress` and `Timer: Start`, (b) resolving/closing tickets requires `State: Done/Fixed` (bypassing the testing lane), `Timer: Stop`, and a recorded `Spent time` value. Denial messages distinguish between:
   - `transcript_missing` — transcript path was absent from the hook payload
-  - `state_not_found` — transcript present but the required state was not recorded
+  - `state_not_found` — transcript present but the required state/fields were not recorded correctly
 
 ---
 
@@ -105,7 +105,7 @@ All targets also sync `.agent/workflows/*.md` and `.agent/rules/*.md` into the d
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**48 tests**, all passing. Coverage spans: policy engine, all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, bugfix frontmatter inference), installer (dry-run and live `--dest` write), profiles, and release packager.
+**51 tests**, all passing. Coverage spans: policy engine, all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write), profiles, and release packager.
 
 ---
 
