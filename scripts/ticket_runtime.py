@@ -43,18 +43,25 @@ def check_youtrack_state_in_transcript(
     transcript_path: str | None,
     issue_id: str,
     expected_states: list[str],
+    expected_timer: str | None = None,
+    require_spent_time: bool = False,
 ) -> YouTrackCheckResult:
     """Checks whether a YouTrack issue was moved to an expected state in the transcript.
 
     Scans the JSONL conversation transcript for a completed `call_mcp_tool`
     call targeting the `youtrack/update_issue` tool with the given issue ID
-    and a `State` field matching one of [expected_states].
+    and a `State` field matching one of [expected_states]. Also optionally
+    verifies that the timer matches expected_timer and Spent time was provided.
 
     Returns a [YouTrackCheckResult] distinguishing three outcomes:
     transcript absent, state not found, or verified.
     """
     if not transcript_path or not os.path.exists(transcript_path):
         return YouTrackCheckResult.transcript_missing()
+
+    latest_state = None
+    latest_timer = None
+    spent_time_seen = False
 
     try:
         with open(transcript_path, "r", encoding="utf-8") as file:
@@ -86,17 +93,31 @@ def check_youtrack_state_in_transcript(
                             tc_args = tc_args_str
 
                         tid = str(tc_args.get("issueId") or "").strip('"\'')
-                        custom_fields = tc_args.get("customFields") or {}
-                        state = str(custom_fields.get("State") or "").strip("\"'")
+                        if tid != issue_id:
+                            continue
 
-                        if tid == issue_id and state in expected_states:
-                            return YouTrackCheckResult.ok()
+                        custom_fields = tc_args.get("customFields") or {}
+                        if "State" in custom_fields:
+                            latest_state = str(custom_fields["State"]).strip("\"'")
+                        if "Timer" in custom_fields:
+                            latest_timer = str(custom_fields["Timer"]).strip("\"'")
+                        if "Spent time" in custom_fields and custom_fields["Spent time"]:
+                            spent_time_seen = True
                 except Exception:
                     pass
     except Exception:
         pass
 
-    return YouTrackCheckResult.state_not_found()
+    if latest_state not in expected_states:
+        return YouTrackCheckResult.state_not_found()
+
+    if expected_timer and latest_timer != expected_timer:
+        return YouTrackCheckResult(verified=False, reason="timer_incorrect")
+
+    if require_spent_time and not spent_time_seen:
+        return YouTrackCheckResult(verified=False, reason="spent_time_missing")
+
+    return YouTrackCheckResult.ok()
 
 
 def get_youtrack_issue_id_from_ticket(filepath: str | None) -> str | None:

@@ -161,11 +161,11 @@ def run(client: str, input_data: dict[str, Any]) -> int:
             abs_src = os.path.abspath(os.path.join(project_root, src_path))
             abs_dst = os.path.abspath(os.path.join(project_root, dst_path))
             is_bugfix = codex_event.is_bugfix_ticket or infer_is_bugfix_ticket(abs_src)
-            if "Tickets/Ready/" in abs_src and "Tickets/Active/" not in abs_dst:
+            if "Tickets/Ready/" in abs_src and "Tickets/Active/" in abs_dst:
                 issue_id = get_youtrack_issue_id_from_ticket(abs_src)
                 if issue_id:
                     transcript_path = input_data.get("transcriptPath")
-                    yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, ["In Progress"])
+                    yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, ["In Progress"], expected_timer="Start")
                     if not yt_result.verified:
                         try:
                             subprocess.run(
@@ -175,11 +175,11 @@ def run(client: str, input_data: dict[str, Any]) -> int:
                                     "--issueId",
                                     issue_id,
                                     "--customFields",
-                                    "{\"State\":\"In Progress\"}",
+                                    "{\"State\":\"In Progress\",\"Timer\":\"Start\"}",
                                 ],
                                 check=False,
                             )
-                            log_debug(f"Auto-updated YouTrack issue {issue_id} to In Progress")
+                            log_debug(f"Auto-updated YouTrack issue {issue_id} to In Progress and started timer")
                         except Exception as exc:
                             log_debug(f"Auto-update failed for issue {issue_id}: {exc}")
 
@@ -203,22 +203,42 @@ def run(client: str, input_data: dict[str, Any]) -> int:
             issue_id = get_youtrack_issue_id_from_ticket(abs_src)
             if issue_id:
                 transcript_path = input_data.get("transcriptPath")
-                allowed_end_states = ["Done", "Fixed", "Test", "Testing", "Resolved"]
-                yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, allowed_end_states)
-                if not yt_result.verified:
-                    detail = (
-                        "transcript not found in conversation context"
-                        if yt_result.reason == "transcript_missing"
-                        else f"state not recorded as one of {allowed_end_states}"
+                if "Tickets/Active/" in abs_dst:
+                    yt_result = check_youtrack_state_in_transcript(
+                        transcript_path, issue_id, ["In Progress"], expected_timer="Start"
                     )
-                    reason = (
-                        f"Move blocked. You must update YouTrack issue {issue_id} state to "
-                        f"'Done', 'Fixed', or 'Test'/'Testing'/'Resolved' via call_mcp_tool before "
-                        f"moving the ticket to Resolved/Closed ({detail})."
+                    if not yt_result.verified:
+                        detail = (
+                            "transcript not found in conversation context"
+                            if yt_result.reason == "transcript_missing"
+                            else "state not set to 'In Progress' or timer not set to 'Start' in transcript"
+                        )
+                        reason = (
+                            f"Move blocked. You must update YouTrack issue {issue_id} state to "
+                            f"'In Progress' and set 'Timer' to 'Start' via call_mcp_tool before "
+                            f"moving the ticket to Active ({detail})."
+                        )
+                        log_debug(f"DENIED: {reason}")
+                        emit_decision(client, PolicyDecision.deny(reason))
+                        return 0
+                elif "Tickets/Resolved/" in abs_dst or "Tickets/Closed/" in abs_dst:
+                    yt_result = check_youtrack_state_in_transcript(
+                        transcript_path, issue_id, ["Done", "Fixed"], expected_timer="Stop", require_spent_time=True
                     )
-                    log_debug(f"DENIED: {reason}")
-                    emit_decision(client, PolicyDecision.deny(reason))
-                    return 0
+                    if not yt_result.verified:
+                        detail = (
+                            "transcript not found in conversation context"
+                            if yt_result.reason == "transcript_missing"
+                            else "state not set to 'Done'/'Fixed', timer not stopped, or spent time not recorded in transcript"
+                        )
+                        reason = (
+                            f"Move blocked. You must update YouTrack issue {issue_id} state to "
+                            f"'Done' or 'Fixed', set 'Timer' to 'Stop', and set 'Spent time' via call_mcp_tool before "
+                            f"moving the ticket to Resolved/Closed ({detail})."
+                        )
+                        log_debug(f"DENIED: {reason}")
+                        emit_decision(client, PolicyDecision.deny(reason))
+                        return 0
 
     markdown_allowed = is_allowed_markdown(file_path, vault_dir, project_root)
     markdown_decision = evaluate(
@@ -264,16 +284,22 @@ def run(client: str, input_data: dict[str, Any]) -> int:
                 transcript_path = input_data.get("transcriptPath")
                 if "Tickets/Active/" in abs_file_path:
                     expected_states = ["In Progress"]
-                    state_desc = "'In Progress'"
+                    expected_timer = "Start"
+                    require_spent_time = False
+                    state_desc = "'In Progress' and set 'Timer' to 'Start'"
                 else:
-                    expected_states = ["Done", "Fixed", "Test", "Testing", "Resolved"]
-                    state_desc = "'Done', 'Fixed', or 'Test'/'Testing'/'Resolved'"
-                yt_result = check_youtrack_state_in_transcript(transcript_path, issue_id, expected_states)
+                    expected_states = ["Done", "Fixed"]
+                    expected_timer = "Stop"
+                    require_spent_time = True
+                    state_desc = "'Done' or 'Fixed', set 'Timer' to 'Stop', and set 'Spent time'"
+                yt_result = check_youtrack_state_in_transcript(
+                    transcript_path, issue_id, expected_states, expected_timer=expected_timer, require_spent_time=require_spent_time
+                )
                 if not yt_result.verified:
                     detail = (
                         "transcript not found in conversation context"
                         if yt_result.reason == "transcript_missing"
-                        else f"state not recorded as one of {expected_states}"
+                        else f"fields not set correctly (expected State in {expected_states}, Timer='{expected_timer}', and Spent time recorded)"
                     )
                     reason = (
                         f"Write blocked. You must update YouTrack issue {issue_id} state to "
