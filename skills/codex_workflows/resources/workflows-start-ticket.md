@@ -12,7 +12,7 @@ This workflow integrates Azure DevOps MCP with the Antigravity "Construction" Pr
 2.  **Retrieve Data**: Use the `azure-devops` MCP to fetch the work item details.
     - **Tool**: `mcp_azure_devops_wit_get_work_item`
 3.  **Clarity Check**: Analyze requirements. If clarity < 0.8, **Pause and Query**.
-4.  **Status Update**: Move work item to "In Progress" via MCP.
+4.  **Status Update**: Move the YouTrack card to "In Progress" using `call_mcp_tool` with `youtrack/update_issue`. You must set the `'State'` custom field to `'In Progress'` and set the `'Timer'` custom field to `'Start'`. Also verify or set the `'Story points'` custom field (estimation field, integer) as appropriate.
 
 ## 2. Knowledge Discovery (The Research Mandate)
 

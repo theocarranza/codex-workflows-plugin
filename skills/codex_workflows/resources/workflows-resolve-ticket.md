@@ -27,20 +27,21 @@ This workflow defines the step-by-step procedure when done with a ticket to ensu
 
 ## Phase 3: PR Review & Tracking (Conditional/Optional)
 1. **Execute PR Code Review** (Optional, user's discretion): Perform or request a PR review.
-2. **Move YouTrack Card** (Conditional to PR Code Review): Move the corresponding YouTrack card to "testing" (using YouTrack MCP or manually).
+2. **Move YouTrack Card**: Skip moving to the "testing" lane for the current effort. We only move the card to testing when code review/qa/testing is actively taking place. For the current effort, we are not using the test lane, move the card straight into done.
 3. **Address Comments**:
    - Address PR comments by changing PR thread status to either *resolved* or *wont fix* (or equivalent).
    - If changes are implemented to satisfy comments, repeat **Phase 1 (ensure-can-merge)**, commit, and push.
 
 ## Phase 4: Merge & Synchronization
 1. **Merge Pull Request**: Once approved, merge the pull request into the `unstable` branch.
-2. **Update Codex Ledger & Session**:
+2. **Update YouTrack Card**: Move the corresponding YouTrack card straight to "Done" using `youtrack/update_issue`. You must set the `'State'` custom field to `'Done'`, set the `'Timer'` custom field to `'Stop'`, and update the `'Spent time'` custom field (formatted as hours/days/weeks, e.g. `'2h 30m'`).
+3. **Update Codex Ledger & Session**:
    - If the ticket is a bugfix, move it from `AI_Codex_SeuMeiSimples/Tickets/Active/` to `AI_Codex_SeuMeiSimples/Tickets/Resolved/`.
    - Otherwise (for feature/task tickets), move it to `AI_Codex_SeuMeiSimples/Tickets/Closed/`.
    - Update the ledger ticket YAML frontmatter `status` to `resolved` (or `closed` as appropriate).
    - Append the `Tasks` and `Walkthrough` sections directly to the ledger ticket, saving both the `task.md` and `walkthrough.md` artifacts contents inside it (under `## Tasks` and `## Walkthrough` respectively).
    - Close the current session file in `Agent_Sessions` and update links.
-3. **Sync Local Workspace**: Checkout the local `unstable` branch and pull the latest changes from origin:
+4. **Sync Local Workspace**: Checkout the local `unstable` branch and pull the latest changes from origin:
    ```bash
    git checkout unstable
    git pull origin unstable

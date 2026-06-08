@@ -10,11 +10,11 @@ When we are done with a ticket, we execute the following workflow:
 - [ ] Task 3. Push the branch to the remote repo
 - [ ] Task 4. Create the Pull Request
 - [ ] Task 5. (Optional, user's discretion) Execute the PR code review
-- [ ] Task 6. (Conditional to step 5) Move the corresponding YouTrack card to "testing"
-- [ ] Task 7. (Conditional to step 6) Address the PR comments, if any, changing the PR thread comment status to either *resolved* or *wont fix* (or equivalent)
+- [ ] Task 6. Skip moving the corresponding YouTrack card to "testing" (for the current effort, we are not using the test lane and move the card straight into done). Only use the "testing" lane when code review/qa/testing is actively taking place.
+- [ ] Task 7. (Conditional) Address the PR comments, if any, changing the PR thread comment status to either *resolved* or *wont fix* (or equivalent)
 - [ ] Task 8. Repeat steps 1, 2, and 3 when all comments selected for implementation are satisfied
 - [ ] Task 9. Merge the pull request
-- [ ] Task 10. Move the corresponding YouTrack card to "done"
+- [ ] Task 10. Move the corresponding YouTrack card straight to "done" using `youtrack/update_issue`. You must set the `'State'` custom field to `'Done'`, set the `'Timer'` custom field to `'Stop'`, and update the `'Spent time'` custom field (formatted as hours/days/weeks, e.g. `'2h 30m'`).
 - [ ] Task 11. Update the ledger ticket (including Tasks and Walkthrough sections with the saved artifacts) and agent session
 - [ ] Task 12. Checkout the local `unstable` branch and pull from origin to sync it
 
