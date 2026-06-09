@@ -51,13 +51,14 @@ def install_from_source(source_root: Path, dest: Path) -> None:
         )
 
 
-def wire(install_dir: Path, target: str, project_dest: str) -> int:
-    """Run the hook-wiring installer from the installed location."""
-    import importlib.util
-    import types
+def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
+    """Run the hook-wiring installer from the installed location.
 
+    When project_dest is None the installer writes to each host's machine-global
+    config location (e.g. ~/.claude/settings.json, ~/Antigravity_IDE/.agents/hooks.json).
+    When project_dest is given, it writes project-level hook configs under that path.
+    """
     # Load the installed cli module with its plugin_root resolved to install_dir.
-    # We insert install_dir into sys.path so its relative imports resolve correctly.
     if str(install_dir) not in sys.path:
         sys.path.insert(0, str(install_dir))
 
@@ -67,7 +68,8 @@ def wire(install_dir: Path, target: str, project_dest: str) -> int:
             del sys.modules[mod_name]
 
     from scripts.installer.cli import install  # noqa: PLC0415
-    from scripts.installer.targets import Target  # noqa: PLC0415
+    from scripts.installer.merge import merge_hook_configs  # noqa: PLC0415
+    from scripts.installer.targets import Target, target_global_config_path  # noqa: PLC0415
 
     if target == "all-agents":
         targets = [t.value for t in Target if t not in {Target.UNIVERSAL, Target.ALL_AGENTS}]
@@ -75,16 +77,31 @@ def wire(install_dir: Path, target: str, project_dest: str) -> int:
         targets = [target]
 
     for t in targets:
-        result = install(t, dest_root=project_dest, plugin_root=install_dir)
-        output = {
-            "target": result.target.value,
-            "configPaths": list(result.config_paths),
-            "command": (
-                result.merged_config and
-                _extract_command(result.merged_config)
-            ),
-        }
-        print(json.dumps(output, indent=2))
+        if project_dest is not None:
+            result = install(t, dest_root=project_dest, plugin_root=install_dir)
+            output = {
+                "target": result.target.value,
+                "configPaths": list(result.config_paths),
+                "command": result.merged_config and _extract_command(result.merged_config),
+            }
+            print(json.dumps(output, indent=2))
+        else:
+            # Global install: compute desired config then write to the known global path.
+            result = install(t, plugin_root=install_dir)  # dry-run to get merged_config
+            global_path = target_global_config_path(t)
+            if global_path is None:
+                print(f"warning: no global config location found for {t}", file=sys.stderr)
+                continue
+            on_disk = json.loads(global_path.read_text()) if global_path.exists() else None
+            final_config = merge_hook_configs(on_disk, result.merged_config)
+            global_path.parent.mkdir(parents=True, exist_ok=True)
+            global_path.write_text(json.dumps(final_config, indent=2), encoding="utf-8")
+            output = {
+                "target": t,
+                "configPaths": [str(global_path)],
+                "command": _extract_command(final_config),
+            }
+            print(json.dumps(output, indent=2))
 
     return 0
 
@@ -136,8 +153,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if args.target and not args.dest:
-        parser.error("--dest is required when --target is specified")
+    # --dest is optional: omitting it wires the host's machine-global config location.
 
     install_dir = Path(args.install_dir).expanduser().resolve()
 
@@ -160,7 +176,8 @@ def main() -> int:
 
     # ── wire step ─────────────────────────────────────────────────────────────
     if args.target:
-        print(f"\nWiring {args.target} → {args.dest} ...")
+        dest_label = args.dest or "global config"
+        print(f"\nWiring {args.target} → {dest_label} ...")
         return wire(install_dir, args.target, args.dest)
 
     return 0

@@ -98,45 +98,34 @@ No additional Python dependencies are needed — the plugin uses only the standa
 
 ### Step 2 — Wire your agent host(s)
 
-Run the installer **from the installed location**, pointing `--dest` at your target project:
+Run bootstrap with `--target` to wire all hosts in one command. The installer knows each host's global config location — no `--dest` needed:
 
 ```bash
-# Claude Code
-python3 ~/.codex-workflows/scripts/installer/cli.py --target claude --dest /path/to/your/project
-
-# Codex
-python3 ~/.codex-workflows/scripts/installer/cli.py --target codex --dest /path/to/your/project
-
-# Gemini CLI
-python3 ~/.codex-workflows/scripts/installer/cli.py --target gemini --dest /path/to/your/project
-
-# Antigravity
-python3 ~/.codex-workflows/scripts/installer/cli.py --target antigravity --dest /path/to/your/project
-
-# All supported hosts at once
-python3 ~/.codex-workflows/scripts/installer/cli.py --target all-agents --dest /path/to/your/project
+# Wire all supported hosts (global config — no project path needed)
+python3 bootstrap.py codex-workflows-plugin-0.2.6.zip --target all-agents
 ```
 
-Running from `~/.codex-workflows/` ensures hook commands in the written config files point back to the installed location — not the repo. This makes the setup portable across projects and independent of where or whether the repo is cloned.
+The plugin auto-discovers each host's config location:
 
-### What Gets Installed in Your Project
-
-For every `--dest` install:
-
-1. **Writes or merges the hook config** into the host-specific file — existing hooks are preserved non-destructively.
-2. **Syncs `.agent/workflows/*.md`** — workflow guides the agent loads as context.
-3. **Syncs `.agent/rules/*.md`** — coding and governance rule files.
-
-### Host Target Reference
-
-| Target | Config written | Hook event |
+| Target | Global config wired | Hook event |
 |---|---|---|
-| `claude` | `.claude/settings.json` | `PreToolUse` |
-| `codex` | `hooks/hooks.json` | `PreToolUse` |
-| `gemini` | `.gemini/settings.json` | `BeforeTool` |
-| `antigravity` | `.agents/hooks.json` | `PreToolUse` |
+| `claude` | `~/.claude/settings.json` | `PreToolUse` |
+| `gemini` | `~/.gemini/settings.json` | `BeforeTool` |
+| `codex` | `~/.gemini/config/hooks.json` | `PreToolUse` |
+| `antigravity` | `<ide-install>/.agents/hooks.json` (auto-discovered) | `PreToolUse` |
 | `all-agents` | all four above | — |
-| `universal` | _(shared assets only — no hook config)_ | — |
+
+Existing hooks in each file are preserved non-destructively.
+
+### Step 2b — Wire a specific project (optional)
+
+To add project-level hooks alongside the global ones, pass `--dest`:
+
+```bash
+python3 bootstrap.py codex-workflows-plugin-0.2.6.zip --target all-agents --dest /path/to/your/project
+```
+
+This also syncs `.agent/workflows/*.md` and `.agent/rules/*.md` into the project.
 
 ### Dry-run
 
@@ -148,11 +137,10 @@ python3 ~/.codex-workflows/scripts/installer/cli.py --target claude --output /tm
 
 ### Updating the plugin
 
-Re-run the bootstrap script with the new zip to replace `~/.codex-workflows/`, then re-run the wiring step for each project:
+Re-run bootstrap with the new zip — it replaces `~/.codex-workflows/` and re-wires in one step:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-<new-version>.zip
-python3 ~/.codex-workflows/scripts/installer/cli.py --target all-agents --dest /path/to/your/project
+python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agents
 ```
 
 ---

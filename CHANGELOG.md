@@ -13,6 +13,22 @@ _(nothing yet)_
 
 ---
 
+## [0.2.6] — 2026-06-09
+
+### Added
+- `target_global_config_path(target)` in `scripts/installer/targets.py`: returns the machine-global hook config location for each supported host, encoding the knowledge gathered about each host's internals:
+  - Claude Code → `~/.claude/settings.json`
+  - Gemini CLI → `~/.gemini/settings.json`
+  - Codex → `~/.gemini/config/hooks.json` (Codex uses the Gemini CLI config layer)
+  - Antigravity → `<ide-install>/.agents/hooks.json` (IDE install dir auto-discovered from `~/Antigravity_IDE/`, `~/antigravity-ide/`, `/opt/…`)
+- `bootstrap.py` global install mode: `--dest` is now optional. When omitted, `wire()` writes hooks directly to each host's global config location. No project path knowledge required from the user.
+
+### Changed
+- README Step 2 rewritten: primary example wires all agents globally (`--target all-agents` with no `--dest`); project-level wiring documented as Step 2b.
+- Global Claude settings (`~/.claude/settings.json`) hook deduplicated and updated to reference `~/.codex-workflows/` instead of the project clone path.
+
+---
+
 ## [0.2.5] — 2026-06-09
 
 ### Changed

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 
 
 class Target(str, Enum):
@@ -23,6 +24,7 @@ def normalize_target(target: str | Target) -> Target:
 
 
 def target_config_paths(target: str | Target) -> tuple[str, ...]:
+    """Project-relative config paths written when --dest is given."""
     normalized = normalize_target(target)
     if normalized == Target.CODEX:
         return ("hooks/hooks.json",)
@@ -35,6 +37,42 @@ def target_config_paths(target: str | Target) -> tuple[str, ...]:
     if normalized in {Target.UNIVERSAL, Target.ALL_AGENTS}:
         return ()
     return ()
+
+
+def target_global_config_path(target: str | Target) -> Path | None:
+    """Absolute path to the machine-global hook config for this target, if discoverable.
+
+    Claude  → ~/.claude/settings.json
+    Gemini  → ~/.gemini/settings.json
+    Codex   → ~/.gemini/config/hooks.json  (Codex uses the Gemini CLI config layer)
+    Antigravity → <ide-install>/.agents/hooks.json  (IDE directory is auto-discovered)
+    """
+    home = Path.home()
+    normalized = normalize_target(target)
+    if normalized == Target.CLAUDE:
+        return home / ".claude" / "settings.json"
+    if normalized == Target.GEMINI:
+        return home / ".gemini" / "settings.json"
+    if normalized == Target.CODEX:
+        return home / ".gemini" / "config" / "hooks.json"
+    if normalized == Target.ANTIGRAVITY:
+        return _discover_antigravity_hooks(home)
+    return None
+
+
+def _discover_antigravity_hooks(home: Path) -> Path | None:
+    """Locate the Antigravity IDE install dir and return its .agents/hooks.json path."""
+    candidates = [
+        home / "Antigravity_IDE",
+        home / "antigravity-ide",
+        home / ".local" / "share" / "Antigravity_IDE",
+        Path("/opt/Antigravity_IDE"),
+        Path("/opt/antigravity"),
+    ]
+    for candidate in candidates:
+        if (candidate / "antigravity-ide").is_file() or (candidate / ".agents").is_dir():
+            return candidate / ".agents" / "hooks.json"
+    return None
 
 
 def target_hook_command(target: str | Target) -> str | None:

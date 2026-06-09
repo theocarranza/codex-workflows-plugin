@@ -97,6 +97,7 @@ def install(
     config_paths = target_config_paths(normalized_target)
     merged_config = None
 
+    desired_hooks: dict[str, Any] | None = None
     if target_config:
         hook_command = _hook_command(normalized_target, plugin_root)
         if normalized_target == Target.ANTIGRAVITY:
