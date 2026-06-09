@@ -13,6 +13,13 @@ _(nothing yet)_
 
 ---
 
+## [0.2.3] — 2026-06-09
+
+### Fixed
+- **Installer portability**: hook commands are now written as absolute paths to the plugin's own scripts directory, so the hook fires correctly from any `--dest` project regardless of working directory. Previously the relative path `python3 skills/codex_workflows/scripts/<host>_enforce_hook.py` would fail in any project that didn't contain the plugin's `skills/` folder.
+
+---
+
 ## [0.2.2] — 2026-06-09
 
 ### Added
