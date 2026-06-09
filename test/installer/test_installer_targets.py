@@ -1,7 +1,15 @@
 import unittest
+from pathlib import Path
 
 from scripts.installer import install
+from scripts.installer.cli import _plugin_root
 from scripts.installer.merge import merge_hook_configs
+
+SCRIPTS_DIR = _plugin_root() / "skills" / "codex_workflows" / "scripts"
+
+
+def _expected_cmd(script_name: str) -> str:
+    return f"python3 {SCRIPTS_DIR / script_name}"
 
 
 class TestInstallerTargets(unittest.TestCase):
@@ -22,7 +30,7 @@ class TestInstallerTargets(unittest.TestCase):
         self.assertIsNotNone(result.merged_config)
         self.assertEqual(
             result.merged_config["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
-            "python3 skills/codex_workflows/scripts/codex_enforce_hook.py",
+            _expected_cmd("codex_enforce_hook.py"),
         )
 
     def test_gemini_target_installs_project_settings(self):
@@ -34,7 +42,7 @@ class TestInstallerTargets(unittest.TestCase):
         self.assertEqual(result.config_paths, (".gemini/settings.json",))
         self.assertEqual(
             result.merged_config["hooks"]["BeforeTool"][0]["hooks"][0]["command"],
-            "python3 skills/codex_workflows/scripts/gemini_enforce_hook.py",
+            _expected_cmd("gemini_enforce_hook.py"),
         )
 
     def test_antigravity_target_installs_hooks_json(self):
@@ -46,7 +54,7 @@ class TestInstallerTargets(unittest.TestCase):
         self.assertEqual(result.config_paths, (".agents/hooks.json",))
         self.assertEqual(
             result.merged_config["codex-enforcer"]["PreToolUse"][0]["hooks"][0]["command"],
-            "python3 skills/codex_workflows/scripts/antigravity_enforce_hook.py",
+            _expected_cmd("antigravity_enforce_hook.py"),
         )
 
     def test_claude_target_installs_project_settings(self):
@@ -58,7 +66,7 @@ class TestInstallerTargets(unittest.TestCase):
         self.assertEqual(result.config_paths, (".claude/settings.json",))
         self.assertEqual(
             result.merged_config["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
-            "python3 skills/codex_workflows/scripts/claude_enforce_hook.py",
+            _expected_cmd("claude_enforce_hook.py"),
         )
 
     def test_merge_hook_configs_preserves_existing_hooks(self):

@@ -28,6 +28,18 @@ def _plugin_root() -> Path:
     return Path(__file__).parent.parent.parent
 
 
+def _hook_command(target: Target, plugin_root: Path) -> str:
+    """Returns the absolute path hook command for the given target."""
+    script_names = {
+        Target.CODEX: "codex_enforce_hook.py",
+        Target.GEMINI: "gemini_enforce_hook.py",
+        Target.ANTIGRAVITY: "antigravity_enforce_hook.py",
+        Target.CLAUDE: "claude_enforce_hook.py",
+    }
+    script = plugin_root / "skills" / "codex_workflows" / "scripts" / script_names[target]
+    return f"python3 {script}"
+
+
 def sync_shared_assets(dest_root: str | Path) -> None:
     """Copies workflow and rules markdown files from the plugin into a destination project.
 
@@ -69,6 +81,7 @@ def install(
     *,
     existing_hooks: dict[str, Any] | None = None,
     dest_root: str | Path | None = None,
+    plugin_root: Path | None = None,
 ) -> InstallResult:
     """Computes (and optionally writes) plugin installation artifacts for a host target.
 
@@ -76,6 +89,7 @@ def install(
     shared assets to the filesystem. When omitted, the function operates in
     dry-run mode and only returns the computed [InstallResult].
     """
+    plugin_root = plugin_root or _plugin_root()
     normalized_target = normalize_target(target)
     shared_assets = normalized_target in {Target.UNIVERSAL, Target.ALL_AGENTS}
     codex_config = normalized_target in {Target.CODEX, Target.ALL_AGENTS}
@@ -84,7 +98,7 @@ def install(
     merged_config = None
 
     if target_config:
-        hook_command = target_hook_command(normalized_target)
+        hook_command = _hook_command(normalized_target, plugin_root)
         if normalized_target == Target.ANTIGRAVITY:
             desired_hooks = {
                 "codex-enforcer": {

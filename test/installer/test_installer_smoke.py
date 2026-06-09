@@ -5,8 +5,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.installer.cli import _plugin_root
 
 CLI = [sys.executable, "-m", "scripts.installer.cli"]
+SCRIPTS_DIR = _plugin_root() / "skills" / "codex_workflows" / "scripts"
+
+
+def _expected_cmd(script_name: str) -> str:
+    return f"python3 {SCRIPTS_DIR / script_name}"
 
 
 class TestInstallerSmoke(unittest.TestCase):
@@ -29,7 +35,7 @@ class TestInstallerSmoke(unittest.TestCase):
             content = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 content["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
-                "python3 skills/codex_workflows/scripts/codex_enforce_hook.py",
+                _expected_cmd("codex_enforce_hook.py"),
             )
 
     def test_gemini_target_writes_settings_file(self):
@@ -42,7 +48,7 @@ class TestInstallerSmoke(unittest.TestCase):
             content = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 content["hooks"]["BeforeTool"][0]["hooks"][0]["command"],
-                "python3 skills/codex_workflows/scripts/gemini_enforce_hook.py",
+                _expected_cmd("gemini_enforce_hook.py"),
             )
 
     def test_antigravity_target_writes_hooks_file(self):
@@ -55,7 +61,7 @@ class TestInstallerSmoke(unittest.TestCase):
             content = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 content["codex-enforcer"]["PreToolUse"][0]["hooks"][0]["command"],
-                "python3 skills/codex_workflows/scripts/antigravity_enforce_hook.py",
+                _expected_cmd("antigravity_enforce_hook.py"),
             )
 
     def test_claude_target_writes_settings_file(self):
@@ -68,7 +74,7 @@ class TestInstallerSmoke(unittest.TestCase):
             content = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 content["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
-                "python3 skills/codex_workflows/scripts/claude_enforce_hook.py",
+                _expected_cmd("claude_enforce_hook.py"),
             )
 
     def test_install_with_dest_syncs_workflows_to_agent_dir(self):
