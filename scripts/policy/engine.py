@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import os
 from .events import CanonicalToolEvent, PolicyDecision
 
 
@@ -19,6 +18,11 @@ def evaluate(event: CanonicalToolEvent) -> PolicyDecision:
     if ticket_decision.is_denied():
         return ticket_decision
 
+    if is_starting_ticket(event):
+        start_decision = _validate_git_and_vault_on_start(event)
+        if start_decision.is_denied():
+            return start_decision
+
     if _requires_session(event) and not event.session_active and not _is_ticket_path(event) and "Agent_Sessions" not in (event.file_path or ""):
         vault_name = event.vault_dir.rsplit("/", 1)[-1] if event.vault_dir else "AI_Codex"
         return PolicyDecision.deny(
@@ -26,6 +30,94 @@ def evaluate(event: CanonicalToolEvent) -> PolicyDecision:
         )
 
     return PolicyDecision.allow()
+
+
+def is_starting_ticket(event: CanonicalToolEvent) -> bool:
+    """Detects if the tool event corresponds to starting/activating a ticket."""
+    if event.source_path and event.destination_path:
+        if "Tickets/Ready/" in event.source_path and "Tickets/Active/" in event.destination_path:
+            return True
+    if event.file_path and "Tickets/Active/" in event.file_path:
+        if event.tool_name in ["write_to_file", "replace_file_content", "multi_replace_file_content"]:
+            if not os.path.exists(event.file_path):
+                return True
+    return False
+
+
+def _validate_git_and_vault_on_start(event: CanonicalToolEvent) -> PolicyDecision:
+    """Enforces git safety and vault active-ticket limits when starting a ticket."""
+    # 1. Check if another ticket is already active in vault
+    if event.vault_dir:
+        active_dir = None
+        for root, dirs, files in os.walk(event.vault_dir):
+            if root.endswith("Tickets/Active"):
+                active_dir = root
+                break
+        if not active_dir:
+            active_dir = os.path.join(event.vault_dir, "Tickets/Active")
+
+        if os.path.exists(active_dir):
+            active_files = [f for f in os.listdir(active_dir) if f.endswith(".md")]
+            target_basename = ""
+            if event.destination_path:
+                target_basename = os.path.basename(event.destination_path)
+            elif event.file_path:
+                target_basename = os.path.basename(event.file_path)
+
+            other_active = [f for f in active_files if f != target_basename]
+            if other_active:
+                return PolicyDecision.deny(
+                    f"Cannot start a new ticket. There is already an active ticket in Tickets/Active: {', '.join(other_active)}. "
+                    "Please resolve or close it first."
+                )
+
+    # Skip git checks if workspace_root is not configured or not a git repo
+    if not event.workspace_root or not os.path.exists(os.path.join(event.workspace_root, ".git")):
+        return PolicyDecision.allow()
+
+    from .git_utils import (
+        get_integration_branch,
+        run_git_fetch,
+        get_commits_behind_base,
+        get_unmerged_commits_intersection,
+        _run_git_cmd,
+    )
+
+    # 2. Get dynamic integration branch
+    base_branch = get_integration_branch(event.workspace_root)
+
+    # 3. Check if checked out on base branch
+    current_branch = _run_git_cmd(["git", "branch", "--show-current"], event.workspace_root)
+    if current_branch == base_branch:
+        return PolicyDecision.deny(
+            f"Cannot start a ticket while checked out on the base integration branch '{base_branch}'. "
+            "Please check out a feature, bugfix, or techdebt branch first."
+        )
+
+    # 4. Fetch origin to get latest remote base status
+    run_git_fetch(event.workspace_root, base_branch)
+
+    # 5. Check if branch is out of sync/behind remote base
+    behind_commits = get_commits_behind_base(event.workspace_root, base_branch)
+    if behind_commits:
+        return PolicyDecision.deny(
+            f"Your current branch '{current_branch}' is out of sync (behind remote origin/{base_branch} by {len(behind_commits)} commits). "
+            f"Please run git pull or merge/rebase with the latest remote origin/{base_branch} before starting work."
+        )
+
+    # 6. Check for unmerged commits from another feature/bugfix branch
+    intersections = get_unmerged_commits_intersection(event.workspace_root, base_branch)
+    if intersections:
+        reasons = []
+        for branch, commits in intersections.items():
+            reasons.append(f"'{branch}' ({len(commits)} unmerged commits)")
+        return PolicyDecision.deny(
+            f"Your current branch contains unmerged commits from another feature/bugfix branch: {', '.join(reasons)}. "
+            f"Please ensure those branches are merged into origin/{base_branch} and synced before starting a new ticket."
+        )
+
+    return PolicyDecision.allow()
+
 
 
 def _is_destructive_command(event: CanonicalToolEvent) -> bool:

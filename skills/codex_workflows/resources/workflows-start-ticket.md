@@ -26,7 +26,7 @@ This workflow integrates Azure DevOps MCP with the Antigravity "Construction" Pr
     - **Path**: `AI_Codex/Projects/<project_name>/Tickets/Active/<ID>-<Kebab-Case-Title>.md`
     - **Status**: Update the YAML frontmatter `status` of the ticket to `active`.
 2.  **Branch Creation**: `{feature, bugfix, refactor, test}/{ticket number}-{ticket-name}`.
-3.  **Prepare Repository**: `git checkout develop && git pull origin develop`.
+3.  **Prepare Repository**: Checkout the dynamically resolved base branch (e.g. `unstable` or `develop`) and pull latest changes (e.g., `git checkout <base_branch> && git pull origin <base_branch>`).
 4.  **Construct Implementation Plan**: 
     - Construct the plan directly in the **Codex Ledger** file.
     - **Mandatory Content**: 

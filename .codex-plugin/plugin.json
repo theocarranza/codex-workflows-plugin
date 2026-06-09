@@ -10,7 +10,7 @@
     "displayName": "Codex Workflows",
     "shortDescription": "Workflow enforcement and session governance",
     "longDescription": "A client-adaptive plugin for workflow enforcement, session bootstrapping, and ticket lifecycle coordination.",
-    "developerName": "OpenAI",
+    "developerName": "agentrick",
     "category": "Productivity",
     "capabilities": [
       "Interactive",

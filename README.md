@@ -1,15 +1,16 @@
 # AI Codex Workflows Plugin
 
-A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, and YouTrack state gating across agent-driven development workflows.
+A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.2.1** — Enforces YouTrack timer start/stop, spent time logging, and bypasses the testing lane straight to Done/Fixed. No project-specific names are hard-coded anywhere in the runtime.
+> **v0.2.1** — Enforces YouTrack timer start/stop, spent time logging, git safety on ticket start, and bypasses the testing lane straight to Done/Fixed. No project-specific names are hard-coded anywhere in the runtime.
 
 ## Purpose
 
 To ensure that autonomous agents consistently follow strict repository governance protocols:
 1. **Mandatory Session Bootstrap**: Blocks all codebase writes until today's session record is initialized in the vault.
 2. **Structured Ticket Progression**: Validates and gates ticket folder transitions (`Ready -> Active -> Closed/Resolved`), enforcing YouTrack state synchronization at each step.
-3. **Destructive-Op Guard**: Prevents `rm`/`rmdir` against the Codex vault — status transitions must always be expressed as file moves.
+3. **Git Safety on Ticket Start**: Before activating a ticket, enforces that no other ticket is already active, the branch is not the base integration branch, the branch is synced with `origin/<base>`, and no unmerged commits from other feature branches are present.
+4. **Destructive-Op Guard**: Prevents `rm`/`rmdir` against the Codex vault — status transitions must always be expressed as file moves.
 
 ## Architecture
 
@@ -17,10 +18,10 @@ To ensure that autonomous agents consistently follow strict repository governanc
 scripts/
 ├── hook_runtime.py       # Entry point — orchestrates all policy checks
 ├── ticket_runtime.py     # Path extraction, YouTrack transcript scanner, bugfix inference
-├── policy/               # Pure policy engine (engine.py + events.py) — no I/O
+├── policy/               # Pure policy engine (engine.py, events.py, git_utils.py) — no I/O
 ├── adapters/             # 4 host adapters: codex, gemini, claude, antigravity
 ├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py)
-└── profiles/             # Workspace profiles (v0.2 scaffolding — not yet wired into runtime)
+└── profiles/             # Workspace profiles (v0.3 scaffolding — not yet wired into runtime)
 skills/                   # 7 skill folders consumed by agent hosts
 .agent/workflows/         # 11 workflow guides synced to target projects on install
 .agent/rules/             # 27 coding & governance rule files synced to target projects
@@ -58,6 +59,11 @@ The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every age
 * **Markdown Allowlist**: Only `CLAUDE.md`, `GEMINI.md`, `.agent/`, and the vault may be written.
 * **Mandatory Session Bootstrapping**: Write tools are blocked until `<vault>/Agent_Sessions/YYYY-MM-DD*.md` exists (with `next: null` frontmatter). Error messages include the actual vault directory name — no project names are hard-coded.
 * **Ticket Destination Validation**: Wrong folder for the ticket type is denied with a specific reason message.
+* **Git Safety on Ticket Start**: When moving a ticket from `Ready/` to `Active/` (or writing a new file into `Active/`), the hook enforces:
+  - No other ticket is already active in `Tickets/Active/`
+  - Current branch is not the base integration branch (dynamically resolved — checks `origin/HEAD`, `remote show origin`, and known branch names in order)
+  - Branch is not behind `origin/<base>` (fetches with a 2 s timeout before checking)
+  - Branch contains no unmerged commits from another local feature/bugfix/techdebt branch
 * **YouTrack State Verification**: Scans the JSONL conversation transcript for a completed `call_mcp_tool(youtrack/update_issue)` call. Enforces that: (a) starting tickets requires `State: In Progress` and `Timer: Start`, (b) resolving/closing tickets requires `State: Done/Fixed` (bypassing the testing lane), `Timer: Stop`, and a recorded `Spent time` value. Denial messages distinguish between:
   - `transcript_missing` — transcript path was absent from the hook payload
   - `state_not_found` — transcript present but the required state/fields were not recorded correctly
@@ -66,36 +72,68 @@ The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every age
 
 ## Installation
 
-Run from the plugin's repository root, pointing `--dest` at your target project:
+### Prerequisites
+
+- Python 3.11+
+- Git (required for git safety checks at ticket-start time)
+- The **target project** must be a git repository
+
+### Get the Plugin
 
 ```bash
-# Antigravity: writes .agents/hooks.json + syncs .agent/workflows/ and .agent/rules/
-python3 -m scripts.installer.cli --target antigravity --dest /path/to/your/project
-
-# Gemini: writes .gemini/settings.json + syncs shared assets
-python3 -m scripts.installer.cli --target gemini --dest /path/to/your/project
-
-# Claude: writes .claude/settings.json + syncs shared assets
-python3 -m scripts.installer.cli --target claude --dest /path/to/your/project
-
-# Codex: writes hooks/hooks.json + syncs shared assets
-python3 -m scripts.installer.cli --target codex --dest /path/to/your/project
-
-# Dry-run: print merged config without writing anything
-python3 -m scripts.installer.cli --target gemini --output /tmp/preview.json
+git clone https://github.com/theocarranza/codex-workflows-plugin.git
+cd codex-workflows-plugin
 ```
 
-### Host Targets
+No additional Python dependencies are needed — the plugin uses only the standard library.
 
-| Target | Config Path | Hook Event |
+### Install for Your Agent Host
+
+Run the installer from the plugin root, pointing `--dest` at your target project:
+
+```bash
+# Claude Code
+python3 -m scripts.installer.cli --target claude --dest /path/to/your/project
+
+# Codex
+python3 -m scripts.installer.cli --target codex --dest /path/to/your/project
+
+# Gemini CLI
+python3 -m scripts.installer.cli --target gemini --dest /path/to/your/project
+
+# Antigravity
+python3 -m scripts.installer.cli --target antigravity --dest /path/to/your/project
+
+# All supported hosts at once
+python3 -m scripts.installer.cli --target all-agents --dest /path/to/your/project
+```
+
+### What Gets Installed
+
+For every `--dest` install the installer:
+
+1. **Writes or merges the hook config** into the host-specific file — existing hooks are preserved non-destructively.
+2. **Syncs `.agent/workflows/*.md`** — workflow guides the agent loads as context.
+3. **Syncs `.agent/rules/*.md`** — coding and governance rule files.
+
+### Host Target Reference
+
+| Target | Config written | Hook event |
 |---|---|---|
+| `claude` | `.claude/settings.json` | `PreToolUse` |
 | `codex` | `hooks/hooks.json` | `PreToolUse` |
 | `gemini` | `.gemini/settings.json` | `BeforeTool` |
 | `antigravity` | `.agents/hooks.json` | `PreToolUse` |
-| `claude` | `.claude/settings.json` | `PreToolUse` |
-| `universal` | _(shared assets only)_ | — |
+| `all-agents` | all four above | — |
+| `universal` | _(shared assets only — no hook config)_ | — |
 
-All targets also sync `.agent/workflows/*.md` and `.agent/rules/*.md` into the destination project. Existing hook configs are merged non-destructively.
+### Dry-run
+
+Preview the merged hook config without writing any files:
+
+```bash
+python3 -m scripts.installer.cli --target claude --output /tmp/preview.json
+```
 
 ---
 
@@ -105,7 +143,7 @@ All targets also sync `.agent/workflows/*.md` and `.agent/rules/*.md` into the d
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**51 tests**, all passing. Coverage spans: policy engine, all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write), profiles, and release packager.
+**75 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write), profiles, and release packager.
 
 ---
 

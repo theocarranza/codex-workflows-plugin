@@ -312,5 +312,122 @@ class TestCodexEnforceHook(unittest.TestCase):
         res = self.run_hook(stdin)
         self.assertEqual(res["permissionDecision"], "allow")
 
+    def init_git_repo(self):
+        # Helper to initialize a real git repo in test_dir
+        git_dir = os.path.join(self.test_dir, ".git")
+        if os.path.exists(git_dir):
+            shutil.rmtree(git_dir)
+        subprocess.run(["git", "init"], cwd=self.test_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=self.test_dir, check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=self.test_dir, check=True)
+        # Create a dummy commit to establish HEAD
+        dummy_file = os.path.join(self.test_dir, "dummy.txt")
+        with open(dummy_file, "w") as f:
+            f.write("initial")
+        subprocess.run(["git", "add", "dummy.txt"], cwd=self.test_dir, check=True)
+        subprocess.run(["git", "commit", "-m", "initial commit"], cwd=self.test_dir, check=True)
+        # Create develop branch
+        subprocess.run(["git", "checkout", "-b", "develop"], cwd=self.test_dir, check=True, capture_output=True)
+
+    def test_deny_start_ticket_on_base_branch(self):
+        self.init_git_repo()
+        # Ensure we are checked out on 'develop'
+        # Try to move a ticket from Ready to Active
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Ready/task-123.md {self.vault_dir}/Tickets/Active/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("Cannot start a ticket while checked out on the base integration branch", res["reason"])
+
+    def test_deny_start_ticket_out_of_sync(self):
+        self.init_git_repo()
+        # Checkout a feature branch from develop
+        subprocess.run(["git", "checkout", "-b", "feature/my-task"], cwd=self.test_dir, check=True, capture_output=True)
+        
+        # Now make 'develop' ahead (simulate remote change by pointing origin/develop ahead)
+        # In a real environment, we'd have a remote. Here, we can create refs/remotes/origin/develop pointing to a new commit.
+        # Let's checkout develop, make a commit, then update remote ref, and checkout feature branch again
+        subprocess.run(["git", "checkout", "develop"], cwd=self.test_dir, check=True, capture_output=True)
+        dummy_file = os.path.join(self.test_dir, "dummy.txt")
+        with open(dummy_file, "a") as f:
+            f.write("\nmore content")
+        subprocess.run(["git", "add", "dummy.txt"], cwd=self.test_dir, check=True)
+        subprocess.run(["git", "commit", "-m", "develop commit"], cwd=self.test_dir, check=True)
+        
+        # Get the commit hash
+        develop_hash = subprocess.check_output(["git", "rev-parse", "develop"], cwd=self.test_dir, text=True).strip()
+        
+        # Create origin/develop ref pointing to this new commit
+        os.makedirs(os.path.join(self.test_dir, ".git", "refs", "remotes", "origin"), exist_ok=True)
+        with open(os.path.join(self.test_dir, ".git", "refs", "remotes", "origin", "develop"), "w") as f:
+            f.write(develop_hash + "\n")
+            
+        # Set origin/HEAD symref to point to origin/develop
+        subprocess.run(["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop"], cwd=self.test_dir, check=True)
+
+        # Checkout feature branch (which is now missing the new develop commit)
+        subprocess.run(["git", "checkout", "feature/my-task"], cwd=self.test_dir, check=True, capture_output=True)
+
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Ready/task-123.md {self.vault_dir}/Tickets/Active/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("out of sync", res["reason"])
+
+    def test_deny_start_ticket_with_unmerged_commits(self):
+        self.init_git_repo()
+        
+        # Set origin/develop tracking ref
+        develop_hash = subprocess.check_output(["git", "rev-parse", "develop"], cwd=self.test_dir, text=True).strip()
+        os.makedirs(os.path.join(self.test_dir, ".git", "refs", "remotes", "origin"), exist_ok=True)
+        with open(os.path.join(self.test_dir, ".git", "refs", "remotes", "origin", "develop"), "w") as f:
+            f.write(develop_hash + "\n")
+        subprocess.run(["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop"], cwd=self.test_dir, check=True)
+
+        # Create feature/other branch and make a commit
+        subprocess.run(["git", "checkout", "-b", "feature/other"], cwd=self.test_dir, check=True, capture_output=True)
+        with open(os.path.join(self.test_dir, "other.txt"), "w") as f:
+            f.write("other changes")
+        subprocess.run(["git", "add", "other.txt"], cwd=self.test_dir, check=True)
+        subprocess.run(["git", "commit", "-m", "other commit"], cwd=self.test_dir, check=True)
+        
+        # Create feature/current branch off of feature/other (so it inherits the unmerged commit)
+        subprocess.run(["git", "checkout", "-b", "feature/current"], cwd=self.test_dir, check=True, capture_output=True)
+
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Ready/task-123.md {self.vault_dir}/Tickets/Active/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("contains unmerged commits from another feature/bugfix branch", res["reason"])
+
+    def test_deny_start_ticket_when_another_active_exists(self):
+        # Create active directory and an existing active ticket file
+        active_dir = os.path.join(self.vault_dir, "Tickets", "Active")
+        os.makedirs(active_dir, exist_ok=True)
+        with open(os.path.join(active_dir, "task-999.md"), "w") as f:
+            f.write("existing active ticket")
+
+        stdin = {
+            "name": "run_command",
+            "arguments": {
+                "CommandLine": f"mv {self.vault_dir}/Tickets/Ready/task-123.md {self.vault_dir}/Tickets/Active/task-123.md"
+            }
+        }
+        res = self.run_hook(stdin)
+        self.assertEqual(res["permissionDecision"], "deny")
+        self.assertIn("There is already an active ticket in Tickets/Active", res["reason"])
+
 if __name__ == "__main__":
     unittest.main()

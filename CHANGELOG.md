@@ -13,21 +13,28 @@ _(nothing yet)_
 
 ---
 
-## [0.2.1] — 2026-06-08
+## [0.2.1] — 2026-06-09
 
 ### Added
-- Timer and Spent time verification to the pre-tool Hook (`check_youtrack_state_in_transcript` in `ticket_runtime.py`):
+- Timer and Spent time verification to the pre-tool hook (`check_youtrack_state_in_transcript` in `ticket_runtime.py`):
   - Active tickets must have `Timer: "Start"` and `State: "In Progress"`.
   - Finished (Resolved/Closed) tickets must have `Timer: "Stop"`, `State: "Done"` or `"Fixed"`, and a non-empty `Spent time` value.
-- Unit/contract tests for Timer and Spent time verification (3 new tests, total of 51 tests).
+- **Git safety enforcement on ticket start** (`scripts/policy/git_utils.py` + `engine.py`):
+  - Blocks starting a ticket if another ticket is already active in `Tickets/Active/`.
+  - Blocks starting a ticket while checked out on the base integration branch.
+  - Base branch is dynamically resolved (checks `origin/HEAD` symref → `remote show origin` → known branch names: `unstable`, `develop`, `main`, `master`).
+  - Blocks starting a ticket if the current branch is behind `origin/<base>` (performs a fast `git fetch` with a 2 s timeout before comparing).
+  - Blocks starting a ticket if the current branch contains unmerged commits from another local feature/bugfix/techdebt branch.
+- 24 new tests covering git safety enforcement (base-branch check, out-of-sync check, unmerged commits check, active-ticket limit); total 75 tests.
 
 ### Changed
-- Bypassed the YouTrack testing lane for the current effort, allowing and expecting finished tickets to move straight to `Done` or `Fixed` (removing `Test`/`Testing`/`Resolved` from allowed finished states in hook validation).
-- Updated workflows (`workflows-start-ticket.md`, `workflows-ai-codex-finish-ticket.md`, and `workflows-resolve-ticket.md`) to instruct agents on starting the timer, filling Story points, stopping the timer, logging spent time, and bypassing the testing lane.
-- Auto-update block conditional in `hook_runtime.py` corrected to trigger when moving a ticket from `Ready` to `Active` (fixed typo `"Tickets/Active/" not in abs_dst` to `in abs_dst`).
+- Bypassed the YouTrack testing lane, allowing finished tickets to move straight to `Done` or `Fixed` (removing `Test`/`Testing`/`Resolved` from allowed finished states).
+- Updated `workflows-start-ticket.md`, `workflows-ai-codex-finish-ticket.md`, and `workflows-resolve-ticket.md` to instruct agents on starting the timer, filling Story points, stopping the timer, logging spent time, and bypassing the testing lane.
+- Updated `workflows-git-origin-sync.md` and `rules-git-workflow.md` to reference the dynamically resolved base branch instead of the hardcoded `develop`.
+- Auto-update block conditional in `hook_runtime.py` corrected to trigger when moving a ticket from `Ready` to `Active`.
 
 ### Fixed
-- Workflow cycle execution gap: fixed pre-tool hooks to actively verify YouTrack timer start/stop and spent time logging.
+- Workflow cycle execution gap: pre-tool hooks now actively verify YouTrack timer start/stop and spent time logging.
 
 ---
 
