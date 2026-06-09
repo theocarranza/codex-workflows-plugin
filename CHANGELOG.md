@@ -13,6 +13,17 @@ _(nothing yet)_
 
 ---
 
+## [0.2.4] — 2026-06-09
+
+### Added
+- `scripts/installer/bootstrap.py`: one-time install script that copies the plugin runtime to `~/.codex-workflows/` from either a release zip or the source tree. Running the hook-wiring CLI from that stable location ensures hook commands reference `~/.codex-workflows/` rather than wherever the repo happens to be cloned.
+- 10 new tests for `bootstrap.py` (source install, zip install, CLI, pycache exclusion, idempotent replace, and the key property: hook commands generated from the installed location point back to `~/.codex-workflows/`). Total: 85 tests.
+
+### Changed
+- README Installation section rewritten as a two-step flow: bootstrap once (Step 1), then wire each project (Step 2). Includes update instructions.
+
+---
+
 ## [0.2.3] — 2026-06-09
 
 ### Fixed

@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.2.3** — Enforces YouTrack timer start/stop, spent time logging, git safety on ticket start, and bypasses the testing lane straight to Done/Fixed. No project-specific names are hard-coded anywhere in the runtime.
+> **v0.2.4** — Enforces YouTrack timer start/stop, spent time logging, git safety on ticket start, and bypasses the testing lane straight to Done/Fixed. No project-specific names are hard-coded anywhere in the runtime.
 
 ## Purpose
 
@@ -78,39 +78,50 @@ The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every age
 - Git (required for git safety checks at ticket-start time)
 - The **target project** must be a git repository
 
-### Get the Plugin
+### Step 1 — Bootstrap the plugin (one-time, per machine)
+
+Download the [latest release zip](https://github.com/theocarranza/codex-workflows-plugin/releases/latest) and run the bootstrap script to install the plugin to `~/.codex-workflows/`:
+
+```bash
+python3 bootstrap.py codex-workflows-plugin-0.2.3.zip
+```
+
+Or, if you prefer to work from a clone:
 
 ```bash
 git clone https://github.com/theocarranza/codex-workflows-plugin.git
 cd codex-workflows-plugin
+python3 -m scripts.installer.bootstrap
 ```
 
 No additional Python dependencies are needed — the plugin uses only the standard library.
 
-### Install for Your Agent Host
+### Step 2 — Wire your agent host(s)
 
-Run the installer from the plugin root, pointing `--dest` at your target project:
+Run the installer **from the installed location**, pointing `--dest` at your target project:
 
 ```bash
 # Claude Code
-python3 -m scripts.installer.cli --target claude --dest /path/to/your/project
+python3 ~/.codex-workflows/scripts/installer/cli.py --target claude --dest /path/to/your/project
 
 # Codex
-python3 -m scripts.installer.cli --target codex --dest /path/to/your/project
+python3 ~/.codex-workflows/scripts/installer/cli.py --target codex --dest /path/to/your/project
 
 # Gemini CLI
-python3 -m scripts.installer.cli --target gemini --dest /path/to/your/project
+python3 ~/.codex-workflows/scripts/installer/cli.py --target gemini --dest /path/to/your/project
 
 # Antigravity
-python3 -m scripts.installer.cli --target antigravity --dest /path/to/your/project
+python3 ~/.codex-workflows/scripts/installer/cli.py --target antigravity --dest /path/to/your/project
 
 # All supported hosts at once
-python3 -m scripts.installer.cli --target all-agents --dest /path/to/your/project
+python3 ~/.codex-workflows/scripts/installer/cli.py --target all-agents --dest /path/to/your/project
 ```
 
-### What Gets Installed
+Running from `~/.codex-workflows/` ensures hook commands in the written config files point back to the installed location — not the repo. This makes the setup portable across projects and independent of where or whether the repo is cloned.
 
-For every `--dest` install the installer:
+### What Gets Installed in Your Project
+
+For every `--dest` install:
 
 1. **Writes or merges the hook config** into the host-specific file — existing hooks are preserved non-destructively.
 2. **Syncs `.agent/workflows/*.md`** — workflow guides the agent loads as context.
@@ -132,7 +143,16 @@ For every `--dest` install the installer:
 Preview the merged hook config without writing any files:
 
 ```bash
-python3 -m scripts.installer.cli --target claude --output /tmp/preview.json
+python3 ~/.codex-workflows/scripts/installer/cli.py --target claude --output /tmp/preview.json
+```
+
+### Updating the plugin
+
+Re-run the bootstrap script with the new zip to replace `~/.codex-workflows/`, then re-run the wiring step for each project:
+
+```bash
+python3 bootstrap.py codex-workflows-plugin-<new-version>.zip
+python3 ~/.codex-workflows/scripts/installer/cli.py --target all-agents --dest /path/to/your/project
 ```
 
 ---
