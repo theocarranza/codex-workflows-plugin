@@ -13,6 +13,16 @@ _(nothing yet)_
 
 ---
 
+## [0.2.5] — 2026-06-09
+
+### Changed
+- `bootstrap.py` now accepts `--target` and `--dest` to install and wire in a single command:
+  `python3 bootstrap.py plugin.zip --target all-agents --dest /my/project`
+- Added `--install-dir` flag to override the default install location (`~/.codex-workflows/`).
+- Wire-only mode: if `~/.codex-workflows/` already exists and only `--target`/`--dest` are passed, the install step is skipped.
+
+---
+
 ## [0.2.4] — 2026-06-09
 
 ### Added

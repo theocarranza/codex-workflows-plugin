@@ -123,9 +123,9 @@ class TestInstallCLI(unittest.TestCase):
 
     def test_install_from_source_via_cli(self):
         with tempfile.TemporaryDirectory() as dest:
-            code, output = self._run("--dest", dest)
+            code, output = self._run("--install-dir", dest)
             self.assertEqual(code, 0)
-            self.assertIn("Done", output)
+            self.assertIn("Installed to", output)
             self.assertTrue((Path(dest) / "scripts").is_dir())
 
 
