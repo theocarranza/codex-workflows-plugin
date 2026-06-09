@@ -13,7 +13,7 @@ _(nothing yet)_
 
 ---
 
-## [0.2.1] — 2026-06-09
+## [0.2.2] — 2026-06-09
 
 ### Added
 - Timer and Spent time verification to the pre-tool hook (`check_youtrack_state_in_transcript` in `ticket_runtime.py`):
