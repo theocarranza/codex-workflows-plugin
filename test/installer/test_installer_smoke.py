@@ -64,6 +64,19 @@ class TestInstallerSmoke(unittest.TestCase):
                 _expected_cmd("antigravity_enforce_hook.py"),
             )
 
+    def test_antigravity_cli_target_writes_settings_file(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_path = Path(tempdir) / "settings.json"
+            result = self._run_installer("antigravity-cli", output_path)
+
+            self.assertTrue(output_path.exists())
+            self.assertEqual(result["configPaths"], [".gemini/antigravity-cli/settings.json"])
+            content = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                content["hooks"]["BeforeTool"][0]["hooks"][0]["command"],
+                _expected_cmd("antigravity_enforce_hook.py"),
+            )
+
     def test_claude_target_writes_settings_file(self):
         with tempfile.TemporaryDirectory() as tempdir:
             output_path = Path(tempdir) / "settings.json"

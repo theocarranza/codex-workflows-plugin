@@ -110,10 +110,11 @@ The plugin auto-discovers each host's config location:
 | Target | Global config wired | Hook event |
 |---|---|---|
 | `claude` | `~/.claude/settings.json` | `PreToolUse` |
-| `gemini` | `~/.gemini/settings.json` | `BeforeTool` |
+| `gemini` | `~/.gemini/settings.json` (Deprecated) | `BeforeTool` |
 | `codex` | `~/.gemini/config/hooks.json` | `PreToolUse` |
 | `antigravity` | `<ide-install>/.agents/hooks.json` (auto-discovered) | `PreToolUse` |
-| `all-agents` | all four above | — |
+| `antigravity-cli` | `~/.gemini/antigravity-cli/settings.json` | `BeforeTool` |
+| `all-agents` | all five above | — |
 
 Existing hooks in each file are preserved non-destructively.
 

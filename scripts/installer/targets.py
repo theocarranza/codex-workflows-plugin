@@ -8,6 +8,7 @@ class Target(str, Enum):
     CODEX = "codex"
     GEMINI = "gemini"
     ANTIGRAVITY = "antigravity"
+    ANTIGRAVITY_CLI = "antigravity-cli"
     CLAUDE = "claude"
     UNIVERSAL = "universal"
     ALL_AGENTS = "all-agents"
@@ -32,6 +33,8 @@ def target_config_paths(target: str | Target) -> tuple[str, ...]:
         return (".gemini/settings.json",)
     if normalized == Target.ANTIGRAVITY:
         return (".agents/hooks.json",)
+    if normalized == Target.ANTIGRAVITY_CLI:
+        return (".gemini/antigravity-cli/settings.json",)
     if normalized == Target.CLAUDE:
         return (".claude/settings.json",)
     if normalized in {Target.UNIVERSAL, Target.ALL_AGENTS}:
@@ -57,6 +60,8 @@ def target_global_config_path(target: str | Target) -> Path | None:
         return home / ".gemini" / "config" / "hooks.json"
     if normalized == Target.ANTIGRAVITY:
         return _discover_antigravity_hooks(home)
+    if normalized == Target.ANTIGRAVITY_CLI:
+        return home / ".gemini" / "antigravity-cli" / "settings.json"
     return None
 
 
@@ -82,6 +87,8 @@ def target_hook_command(target: str | Target) -> str | None:
     if normalized == Target.GEMINI:
         return "python3 skills/codex_workflows/scripts/gemini_enforce_hook.py"
     if normalized == Target.ANTIGRAVITY:
+        return "python3 skills/codex_workflows/scripts/antigravity_enforce_hook.py"
+    if normalized == Target.ANTIGRAVITY_CLI:
         return "python3 skills/codex_workflows/scripts/antigravity_enforce_hook.py"
     if normalized == Target.CLAUDE:
         return "python3 skills/codex_workflows/scripts/claude_enforce_hook.py"

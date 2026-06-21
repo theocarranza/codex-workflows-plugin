@@ -103,7 +103,7 @@ def select_adapter(client: str) -> tuple[Callable[[dict[str, Any], str, str], Ca
     normalized = client.strip().lower()
     if normalized == "gemini":
         return parse_gemini_payload, format_gemini_decision
-    if normalized == "antigravity":
+    if normalized == "antigravity" or normalized == "antigravity-cli":
         return parse_antigravity_payload, format_antigravity_decision
     if normalized == "claude":
         return parse_claude_payload, format_claude_decision

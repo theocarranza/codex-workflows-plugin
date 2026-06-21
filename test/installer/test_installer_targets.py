@@ -57,6 +57,18 @@ class TestInstallerTargets(unittest.TestCase):
             _expected_cmd("antigravity_enforce_hook.py"),
         )
 
+    def test_antigravity_cli_target_installs_project_settings(self):
+        result = install(target="antigravity-cli")
+
+        self.assertFalse(result.written_codex_config)
+        self.assertTrue(result.written_shared_assets)
+        self.assertTrue(result.written_target_config)
+        self.assertEqual(result.config_paths, (".gemini/antigravity-cli/settings.json",))
+        self.assertEqual(
+            result.merged_config["hooks"]["BeforeTool"][0]["hooks"][0]["command"],
+            _expected_cmd("antigravity_enforce_hook.py"),
+        )
+
     def test_claude_target_installs_project_settings(self):
         result = install(target="claude")
 

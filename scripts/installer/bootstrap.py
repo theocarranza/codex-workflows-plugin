@@ -72,10 +72,11 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
     from scripts.installer.targets import Target, target_global_config_path  # noqa: PLC0415
 
     client_names = {
-        "claude": "Claude Code (claude-cli)",
-        "gemini": "Gemini CLI (gemini)",
-        "codex": "Codex CLI (codex-cli)",
+        "claude": "Claude (IDE plugin)",
+        "gemini": "Gemini CLI (gemini) [Deprecated]",
+        "codex": "Codex (IDE plugin)",
         "antigravity": "Antigravity IDE",
+        "antigravity-cli": "Antigravity CLI (antigravity-cli)",
     }
 
     if target == "all-agents":

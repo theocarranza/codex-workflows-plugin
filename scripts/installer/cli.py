@@ -34,6 +34,7 @@ def _hook_command(target: Target, plugin_root: Path) -> str:
         Target.CODEX: "codex_enforce_hook.py",
         Target.GEMINI: "gemini_enforce_hook.py",
         Target.ANTIGRAVITY: "antigravity_enforce_hook.py",
+        Target.ANTIGRAVITY_CLI: "antigravity_enforce_hook.py",
         Target.CLAUDE: "claude_enforce_hook.py",
     }
     script = plugin_root / "skills" / "codex_workflows" / "scripts" / script_names[target]
@@ -96,7 +97,7 @@ def install(
     normalized_target = normalize_target(target)
     shared_assets = normalized_target in {Target.UNIVERSAL, Target.ALL_AGENTS}
     codex_config = normalized_target in {Target.CODEX, Target.ALL_AGENTS}
-    target_config = normalized_target in {Target.CODEX, Target.GEMINI, Target.ANTIGRAVITY, Target.CLAUDE}
+    target_config = normalized_target in {Target.CODEX, Target.GEMINI, Target.ANTIGRAVITY, Target.ANTIGRAVITY_CLI, Target.CLAUDE}
     config_paths = target_config_paths(normalized_target)
     merged_config = None
 
@@ -122,6 +123,23 @@ def install(
                 }
             }
         elif normalized_target == Target.GEMINI:
+            desired_hooks = {
+                "hooks": {
+                    "BeforeTool": [
+                        {
+                            "matcher": "*",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": hook_command,
+                                    "timeout": 5,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        elif normalized_target == Target.ANTIGRAVITY_CLI:
             desired_hooks = {
                 "hooks": {
                     "BeforeTool": [
