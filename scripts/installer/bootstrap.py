@@ -75,7 +75,7 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
         "claude": "Claude Code (claude-cli)",
         "gemini": "Gemini CLI (gemini)",
         "codex": "Codex CLI (codex-cli)",
-        "antigravity": "Antigravity IDE (antigravity-cli)",
+        "antigravity": "Antigravity IDE",
     }
 
     if target == "all-agents":
