@@ -71,37 +71,100 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
     from scripts.installer.merge import merge_hook_configs  # noqa: PLC0415
     from scripts.installer.targets import Target, target_global_config_path  # noqa: PLC0415
 
+    client_names = {
+        "claude": "Claude Code (claude-cli)",
+        "gemini": "Gemini CLI (gemini)",
+        "codex": "Codex CLI (codex-cli)",
+        "antigravity": "Antigravity IDE (antigravity-cli)",
+    }
+
     if target == "all-agents":
         targets = [t.value for t in Target if t not in {Target.UNIVERSAL, Target.ALL_AGENTS}]
     else:
         targets = [target]
 
+    successful_wirings = []
+    skipped_wirings = []
+
     for t in targets:
+        client_name = client_names.get(t, t)
         if project_dest is not None:
-            result = install(t, dest_root=project_dest, plugin_root=install_dir)
-            output = {
-                "target": result.target.value,
-                "configPaths": list(result.config_paths),
-                "command": result.merged_config and _extract_command(result.merged_config),
-            }
-            print(json.dumps(output, indent=2))
+            # Local project install
+            try:
+                result = install(t, dest_root=project_dest, plugin_root=install_dir)
+                if result.config_paths:
+                    config_path = Path(project_dest) / result.config_paths[0]
+                    cmd = result.merged_config and _extract_command(result.merged_config)
+                    successful_wirings.append((client_name, str(config_path), cmd))
+                else:
+                    skipped_wirings.append((client_name, "No config paths defined for target"))
+            except Exception as e:
+                if target != "all-agents":
+                    print(f"Error wiring local target {t}: {e}", file=sys.stderr)
+                    return 1
+                skipped_wirings.append((client_name, f"Failed: {e}"))
         else:
-            # Global install: compute desired config then write to the known global path.
-            result = install(t, plugin_root=install_dir)  # dry-run to get merged_config
+            # Global machine install
             global_path = target_global_config_path(t)
             if global_path is None:
-                print(f"warning: no global config location found for {t}", file=sys.stderr)
+                if target != "all-agents":
+                    print(f"Error: Could not locate the global configuration path for '{client_name}'.", file=sys.stderr)
+                    print("Make sure the CLI/IDE client is installed or run once to initialize its config directory.", file=sys.stderr)
+                    return 1
+                skipped_wirings.append((client_name, "Config directory/installation not found on this machine"))
                 continue
-            on_disk = json.loads(global_path.read_text()) if global_path.exists() else None
-            final_config = merge_hook_configs(on_disk, result.merged_config)
-            global_path.parent.mkdir(parents=True, exist_ok=True)
-            global_path.write_text(json.dumps(final_config, indent=2), encoding="utf-8")
-            output = {
-                "target": t,
-                "configPaths": [str(global_path)],
-                "command": _extract_command(final_config),
-            }
-            print(json.dumps(output, indent=2))
+
+            try:
+                # Compute desired config then write to the known global path.
+                result = install(t, plugin_root=install_dir)  # dry-run to get merged_config
+                on_disk = json.loads(global_path.read_text()) if global_path.exists() else None
+                final_config = merge_hook_configs(on_disk, result.merged_config)
+                global_path.parent.mkdir(parents=True, exist_ok=True)
+                global_path.write_text(json.dumps(final_config, indent=2), encoding="utf-8")
+                
+                cmd = _extract_command(final_config)
+                successful_wirings.append((client_name, str(global_path), cmd))
+            except Exception as e:
+                if target != "all-agents":
+                    print(f"Error wiring global target {t}: {e}", file=sys.stderr)
+                    return 1
+                skipped_wirings.append((client_name, f"Failed to write config: {e}"))
+
+    # If --target all-agents was specified, but we could not wire anything, exit with an error.
+    if target == "all-agents" and not successful_wirings:
+        print("Error: None of the agent CLI clients could be successfully wired.", file=sys.stderr)
+        print("We checked the global configuration paths but none of the CLI/IDE installs were detected.", file=sys.stderr)
+        print("Please check your installations or install clients (e.g. Claude Code or Gemini CLI) first.", file=sys.stderr)
+        return 1
+
+    # Print a beautiful summary of the wiring status
+    print("\n" + "=" * 70)
+    print("                      WIRING INSTALLATION SUMMARY                      ")
+    print("=" * 70)
+    
+    if successful_wirings:
+        print("Successfully Wired Clients:")
+        for client, path, cmd in successful_wirings:
+            print(f"  ✔ {client}")
+            print(f"    Config file: {path}")
+            if cmd:
+                print(f"    Hook command: {cmd}")
+            print()
+    
+    if skipped_wirings:
+        print("Skipped Clients (not configured or missing):")
+        for client, reason in skipped_wirings:
+            print(f"  ✗ {client}")
+            print(f"    Reason: {reason}")
+            print()
+
+    print("Further Instructions:")
+    print("  1. Restart your active CLI / IDE client session to load the new hooks.")
+    print("  2. To wire a local project with workflows and rules guides, run:")
+    print(f"     python3 -m scripts.installer.bootstrap --target all-agents --dest /path/to/project")
+    print("  3. To scaffold ticket drafts and generate YouTrack registration payloads:")
+    print("     python3 scripts/create_ticket.py --summary \"Your ticket title\"")
+    print("=" * 70 + "\n")
 
     return 0
 
@@ -179,6 +242,20 @@ def main() -> int:
         dest_label = args.dest or "global config"
         print(f"\nWiring {args.target} → {dest_label} ...")
         return wire(install_dir, args.target, args.dest)
+    else:
+        # Better help message if no target is specified
+        print("\n" + "=" * 70)
+        print("                  INSTALLATION COMPLETED SUCCESSFULLY                  ")
+        print("=" * 70)
+        print(f"The plugin runtime assets have been installed to:")
+        print(f"  {install_dir}")
+        print()
+        print("To wire the plugin to your agent hosts, run:")
+        print(f"  python3 -m scripts.installer.bootstrap --target all-agents")
+        print()
+        print("To wire a specific local project repository (with rules and guides):")
+        print(f"  python3 -m scripts.installer.bootstrap --target all-agents --dest /path/to/project")
+        print("=" * 70 + "\n")
 
     return 0
 
