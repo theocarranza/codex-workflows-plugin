@@ -85,6 +85,7 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
 
     successful_wirings = []
     skipped_wirings = []
+    failed_wirings = []
 
     for t in targets:
         client_name = client_names.get(t, t)
@@ -99,25 +100,34 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
                 else:
                     skipped_wirings.append((client_name, "No config paths defined for target"))
             except Exception as e:
-                if target != "all-agents":
-                    print(f"Error wiring local target {t}: {e}", file=sys.stderr)
-                    return 1
-                skipped_wirings.append((client_name, f"Failed: {e}"))
+                failed_wirings.append((client_name, f"Exception: {e}"))
         else:
             # Global machine install
             global_path = target_global_config_path(t)
             if global_path is None:
                 if target != "all-agents":
-                    print(f"Error: Could not locate the global configuration path for '{client_name}'.", file=sys.stderr)
-                    print("Make sure the CLI/IDE client is installed or run once to initialize its config directory.", file=sys.stderr)
-                    return 1
-                skipped_wirings.append((client_name, "Config directory/installation not found on this machine"))
+                    failed_wirings.append((client_name, "Could not locate the global configuration path for this client."))
+                else:
+                    skipped_wirings.append((client_name, "Config directory/installation not found on this machine"))
+                continue
+
+            if not global_path.parent.is_dir() and not global_path.exists():
+                if target != "all-agents":
+                    failed_wirings.append((client_name, f"Configuration directory '{global_path.parent}' does not exist."))
+                else:
+                    skipped_wirings.append((client_name, "Client installation/directory not found"))
                 continue
 
             try:
                 # Compute desired config then write to the known global path.
                 result = install(t, plugin_root=install_dir)  # dry-run to get merged_config
-                on_disk = json.loads(global_path.read_text()) if global_path.exists() else None
+                on_disk = None
+                if global_path.exists():
+                    try:
+                        on_disk = json.loads(global_path.read_text(encoding="utf-8"))
+                    except Exception as parse_err:
+                        raise ValueError(f"Existing configuration file contains invalid JSON: {parse_err}")
+
                 final_config = merge_hook_configs(on_disk, result.merged_config)
                 global_path.parent.mkdir(parents=True, exist_ok=True)
                 global_path.write_text(json.dumps(final_config, indent=2), encoding="utf-8")
@@ -125,17 +135,7 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
                 cmd = _extract_command(final_config)
                 successful_wirings.append((client_name, str(global_path), cmd))
             except Exception as e:
-                if target != "all-agents":
-                    print(f"Error wiring global target {t}: {e}", file=sys.stderr)
-                    return 1
-                skipped_wirings.append((client_name, f"Failed to write config: {e}"))
-
-    # If --target all-agents was specified, but we could not wire anything, exit with an error.
-    if target == "all-agents" and not successful_wirings:
-        print("Error: None of the agent CLI clients could be successfully wired.", file=sys.stderr)
-        print("We checked the global configuration paths but none of the CLI/IDE installs were detected.", file=sys.stderr)
-        print("Please check your installations or install clients (e.g. Claude Code or Gemini CLI) first.", file=sys.stderr)
-        return 1
+                failed_wirings.append((client_name, str(e)))
 
     # Print a beautiful summary of the wiring status
     print("\n" + "=" * 70)
@@ -157,6 +157,28 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
             print(f"  ✗ {client}")
             print(f"    Reason: {reason}")
             print()
+
+    if failed_wirings:
+        print("FAILED Clients (wiring encountered errors):")
+        for client, error_msg in failed_wirings:
+            print(f"  🛑 {client}")
+            print(f"     Error: {error_msg}")
+            print()
+
+    # Further instructions or error exit
+    if failed_wirings:
+        print("Error: Wiring failed for one or more requested clients.")
+        print("Please check the errors listed above and resolve them.")
+        print("=" * 70 + "\n")
+        return 1
+
+    # If --target all-agents was specified, but we could not wire anything, exit with an error.
+    if target == "all-agents" and not successful_wirings:
+        print("Error: None of the agent CLI clients could be successfully wired.", file=sys.stderr)
+        print("We checked the global configuration paths but none of the CLI/IDE installs were detected.", file=sys.stderr)
+        print("Please check your installations or install clients (e.g. Claude Code or Gemini CLI) first.", file=sys.stderr)
+        print("=" * 70 + "\n")
+        return 1
 
     print("Further Instructions:")
     print("  1. Restart your active CLI / IDE client session to load the new hooks.")
