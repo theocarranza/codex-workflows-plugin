@@ -94,6 +94,23 @@ class TestInstallerSmoke(unittest.TestCase):
             md_files = list(workflows_dir.glob("*.md"))
             self.assertGreater(len(md_files), 0, "at least one workflow file should be synced")
 
+    def test_install_with_dest_syncs_workflows_subdirectories(self):
+        """When --dest is provided, workflows subdirectories (like templates/) are copied recursively."""
+        with tempfile.TemporaryDirectory() as tempdir:
+            completed = subprocess.run(
+                [sys.executable, "-m", "scripts.installer.cli",
+                 "--target", "gemini", "--dest", tempdir],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = json.loads(completed.stdout)
+            self.assertEqual(result["target"], "gemini")
+            templates_dir = Path(tempdir) / ".agent" / "workflows" / "templates"
+            self.assertTrue(templates_dir.is_dir(), "templates subdirectory should have been copied")
+            template_files = list(templates_dir.glob("*.md"))
+            self.assertGreater(len(template_files), 0, "template files should be present in synced templates dir")
+
     def test_install_with_dest_writes_target_config_in_place(self):
         """When --dest is provided, the hook config is written at the correct relative path."""
         with tempfile.TemporaryDirectory() as tempdir:

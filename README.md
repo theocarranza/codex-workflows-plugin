@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.2.5** — Enforces YouTrack timer start/stop, spent time logging, git safety on ticket start, and bypasses the testing lane straight to Done/Fixed. No project-specific names are hard-coded anywhere in the runtime.
+> **v0.2.7** — Enforces YouTrack timer start/stop, spent time logging, git safety on ticket start, and bypasses the testing lane straight to Done/Fixed. Supports standardized issue template scaffolding and recursive directory sync.
 
 ## Purpose
 
@@ -23,7 +23,7 @@ scripts/
 ├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py)
 └── profiles/             # Workspace profiles (v0.3 scaffolding — not yet wired into runtime)
 skills/                   # 7 skill folders consumed by agent hosts
-.agent/workflows/         # 11 workflow guides synced to target projects on install
+.agent/workflows/         # 12 workflow guides synced to target projects on install
 .agent/rules/             # 27 coding & governance rule files synced to target projects
 ```
 
@@ -151,7 +151,7 @@ python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agent
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**75 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write), profiles, and release packager.
+**76 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying), profiles, and release packager.
 
 ---
 

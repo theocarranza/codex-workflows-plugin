@@ -43,7 +43,7 @@ def _hook_command(target: Target, plugin_root: Path) -> str:
 def sync_shared_assets(dest_root: str | Path) -> None:
     """Copies workflow and rules markdown files from the plugin into a destination project.
 
-    Syncs `.agent/workflows/*.md` and `.agent/rules/*.md` from the plugin root
+    Syncs `.agent/workflows/` and `.agent/rules/` from the plugin root
     to the corresponding directories under [dest_root]. Missing destination
     directories are created automatically. Existing files are overwritten.
     """
@@ -56,8 +56,11 @@ def sync_shared_assets(dest_root: str | Path) -> None:
         if not src_dir.is_dir():
             continue
         dst_dir.mkdir(parents=True, exist_ok=True)
-        for md_file in src_dir.glob("*.md"):
-            shutil.copy2(md_file, dst_dir / md_file.name)
+        for item in src_dir.iterdir():
+            if item.is_file() and item.suffix == ".md":
+                shutil.copy2(item, dst_dir / item.name)
+            elif item.is_dir():
+                shutil.copytree(item, dst_dir / item.name, dirs_exist_ok=True)
 
 
 def write_target_config(
@@ -226,4 +229,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

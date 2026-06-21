@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and local configuration files
+.claude/
+.gemini/
+.idea/
+.vscode/
+
+# Obsidian local settings
+.obsidian/
+AI_Codex/.obsidian/
+AI_Codex/Projects/.obsidian/
+
+# Local installation files and release distributions
+.agent/
+dist/
+build/

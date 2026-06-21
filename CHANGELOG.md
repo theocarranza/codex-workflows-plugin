@@ -13,6 +13,18 @@ _(nothing yet)_
 
 ---
 
+## [0.2.7] — 2026-06-21
+
+### Added
+- Standardized templates for issue/ticket creation (`feature-template.md`, `bug-template.md`, `task-template.md`) under `.agent/workflows/templates/`.
+- Workflow guide `workflows-create-issue.md` under `.agent/workflows/` detailing the step-by-step issue creation, YouTrack MCP registration, and local ticket lifecycle file movements.
+- Script harness `scripts/create_ticket.py` to scaffold local ticket drafts and generate YouTrack MCP payload.
+
+### Changed
+- Refactored `sync_shared_assets(dest_root)` in `scripts/installer/cli.py` to recursively copy subdirectories under `.agent/workflows/` (allowing `templates/` folder to sync to the target project).
+
+---
+
 ## [0.2.6] — 2026-06-09
 
 ### Added
