@@ -72,9 +72,9 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
     from scripts.installer.targets import Target, target_global_config_path  # noqa: PLC0415
 
     client_names = {
-        "claude": "Claude (IDE plugin)",
+        "claude": "Claude CLI (claude-cli) & IDE plugin",
         "gemini": "Gemini CLI (gemini) [Deprecated]",
-        "codex": "Codex (IDE plugin)",
+        "codex": "Codex CLI (codex-cli) & IDE plugin",
         "antigravity": "Antigravity IDE",
         "antigravity-cli": "Antigravity CLI (antigravity-cli)",
     }
@@ -244,6 +244,9 @@ def main() -> int:
     install_dir = Path(args.install_dir).expanduser().resolve()
 
     # ── install step ──────────────────────────────────────────────────────────
+    script_dir = Path(__file__).parent.parent.parent.resolve()
+    is_running_from_install_dir = (script_dir == install_dir)
+
     if args.zip:
         zip_path = Path(args.zip).expanduser().resolve()
         if not zip_path.exists():
@@ -252,7 +255,7 @@ def main() -> int:
         print(f"Installing {zip_path} → {install_dir} ...")
         install_from_zip(zip_path, install_dir)
         print(f"Installed to {install_dir}")
-    elif args.target and install_dir.exists():
+    elif args.target and install_dir.exists() and is_running_from_install_dir:
         pass  # wire-only: skip install
     else:
         source_root = Path(__file__).parent.parent.parent
