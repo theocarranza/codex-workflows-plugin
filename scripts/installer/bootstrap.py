@@ -19,9 +19,18 @@ import json
 import shutil
 import sys
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 INSTALL_DIR = Path.home() / ".codex-workflows"
+
+# Script filenames that belong to this plugin — used to strip stale hook entries.
+_MANAGED_HOOK_SCRIPTS = {
+    "codex_enforce_hook.py",
+    "gemini_enforce_hook.py",
+    "antigravity_enforce_hook.py",
+    "claude_enforce_hook.py",
+}
 
 _RUNTIME_DIRS = ["scripts", "skills", ".agent", "hooks", ".codex-plugin"]
 
@@ -49,6 +58,212 @@ def install_from_source(source_root: Path, dest: Path) -> None:
             dest / dirname,
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
+
+
+def strip_managed_hooks(config: dict, script_names: set[str]) -> dict:
+    """Remove hook entries whose command references any of the given script filenames.
+
+    Walks the entire config recursively so it handles both Gemini-style
+    (``hooks.BeforeTool``) and Antigravity-style (``codex-enforcer.PreToolUse``) shapes.
+    """
+    result = {}
+    for key, value in config.items():
+        if isinstance(value, dict):
+            result[key] = strip_managed_hooks(value, script_names)
+        elif isinstance(value, list):
+            cleaned = []
+            for entry in value:
+                if not isinstance(entry, dict) or "hooks" not in entry:
+                    cleaned.append(entry)
+                    continue
+                fresh_hooks = [
+                    h for h in entry["hooks"]
+                    if not any(s in h.get("command", "") for s in script_names)
+                ]
+                if fresh_hooks:
+                    cleaned.append({**entry, "hooks": fresh_hooks})
+            result[key] = cleaned
+        else:
+            result[key] = value
+    return result
+
+
+def register_claude_plugin(install_dir: Path) -> bool:
+    """Install the plugin into ~/.claude/plugins/cache/ and register it.
+
+    Copies the plugin's ``skills/`` tree into the Claude plugin cache so Claude
+    Code can discover and load the skills, then adds/updates a ``@local`` entry
+    in ``installed_plugins.json``.  Returns True on success.
+    """
+    manifest_path = install_dir / ".codex-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        manifest_path = install_dir / "plugin.json"
+    if not manifest_path.exists():
+        return False
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    name = manifest.get("name", "codex-workflows-plugin")
+    version = manifest.get("version", "unknown")
+
+    # Copy into the Claude plugin cache under a "local" marketplace bucket.
+    cache_dir = Path.home() / ".claude" / "plugins" / "cache" / "local" / name / version
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+    cache_dir.mkdir(parents=True)
+
+    # Copy skills directory.
+    src_skills = install_dir / "skills"
+    if src_skills.is_dir():
+        shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+
+    # Write a minimal plugin.json (no extra fields) matching the format Claude expects.
+    clean_manifest = {k: manifest[k] for k in ("name", "description", "version", "author") if k in manifest}
+    (cache_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+
+    registry_path = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
+    registry: dict = {"version": 2, "plugins": {}}
+    if registry_path.exists():
+        try:
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+
+    plugin_key = f"{name}@local"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{datetime.now(timezone.utc).microsecond // 1000:03d}Z"
+    existing_entries = registry.setdefault("plugins", {}).get(plugin_key, [])
+    installed_at = existing_entries[0].get("installedAt", now) if existing_entries else now
+
+    registry["plugins"][plugin_key] = [{
+        "scope": "user",
+        "installPath": str(cache_dir),
+        "version": version,
+        "installedAt": installed_at,
+        "lastUpdated": now,
+    }]
+
+    registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    return True
+
+
+def register_antigravity_plugin(install_dir: Path) -> bool:
+    """Install the plugin into ~/.gemini/antigravity-ide/plugins/ for the Antigravity IDE.
+
+    The Antigravity IDE discovers plugins by scanning that directory directly —
+    there is no installed_plugins.json. Each subdirectory must contain a minimal
+    ``plugin.json`` (name, description, disabled) and a ``skills/`` tree.
+    Returns True if the IDE plugins directory exists and registration succeeded.
+    """
+    ide_plugins_dir = Path.home() / ".gemini" / "antigravity-ide" / "plugins"
+    if not ide_plugins_dir.is_dir():
+        return False
+
+    manifest_path = install_dir / ".codex-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        manifest_path = install_dir / "plugin.json"
+    if not manifest_path.exists():
+        return False
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    name = manifest.get("name", "codex-workflows-plugin")
+    author = manifest.get("author", {}).get("name", "local") if isinstance(manifest.get("author"), dict) else "local"
+    description = manifest.get("description", "")
+
+    # Naming convention mirrors existing IDE plugins: Author.pluginName.pluginName
+    plugin_dir = ide_plugins_dir / f"{author}.{name}.{name}"
+    if plugin_dir.exists():
+        shutil.rmtree(plugin_dir)
+    plugin_dir.mkdir(parents=True)
+
+    src_skills = install_dir / "skills"
+    if src_skills.is_dir():
+        shutil.copytree(src_skills, plugin_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+
+    ide_manifest = {"name": name, "description": description, "disabled": False}
+    (plugin_dir / "plugin.json").write_text(json.dumps(ide_manifest), encoding="utf-8")
+    return True
+
+
+def register_antigravity_config_plugin(install_dir: Path) -> bool:
+    """Install the plugin into ~/.gemini/config/plugins/ (Antigravity user-global plugin layer).
+
+    This layer is shared across all Antigravity surfaces (IDE, CLI). Format mirrors
+    the android-cli-plugin reference: plugin.json (fuller schema), installed_version.json,
+    and skills/. Returns True if the directory exists and registration succeeded.
+    """
+    config_plugins_dir = Path.home() / ".gemini" / "config" / "plugins"
+    if not config_plugins_dir.is_dir():
+        return False
+
+    manifest_path = install_dir / ".codex-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        manifest_path = install_dir / "plugin.json"
+    if not manifest_path.exists():
+        return False
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    name = manifest.get("name", "codex-workflows-plugin")
+    version = manifest.get("version", "unknown")
+
+    plugin_dir = config_plugins_dir / name
+    if plugin_dir.is_symlink():
+        plugin_dir.unlink()
+    elif plugin_dir.exists():
+        shutil.rmtree(plugin_dir)
+    plugin_dir.mkdir(parents=True)
+
+    src_skills = install_dir / "skills"
+    if src_skills.is_dir():
+        shutil.copytree(src_skills, plugin_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+
+    # Full plugin.json matching the android-cli-plugin schema (name, version, description, author).
+    clean_manifest = {k: manifest[k] for k in ("name", "version", "description", "author") if k in manifest}
+    (plugin_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+    (plugin_dir / "installed_version.json").write_text(json.dumps({"version": version}), encoding="utf-8")
+    return True
+
+
+def register_codex_plugin(install_dir: Path) -> bool:
+    """Register the plugin in ~/.agents/plugins/marketplace.json for Codex discovery.
+
+    Codex discovers the personal marketplace at that path implicitly — no
+    ``codex plugin marketplace add`` needed. After this function runs the user
+    must run ``codex plugin add <name>@personal`` once to pull the plugin into
+    Codex's cache. Returns True if marketplace.json was written successfully.
+    """
+    codex_manifest = install_dir / ".codex-plugin" / "plugin.json"
+    if not codex_manifest.exists():
+        return False
+
+    manifest = json.loads(codex_manifest.read_text(encoding="utf-8"))
+    name = manifest.get("name", "codex-workflows-plugin")
+    category = manifest.get("interface", {}).get("category", "Productivity")
+
+    marketplace_path = Path.home() / ".agents" / "plugins" / "marketplace.json"
+    marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if marketplace_path.exists():
+        try:
+            marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            marketplace = {}
+    else:
+        marketplace = {}
+
+    marketplace.setdefault("name", "personal")
+    marketplace.setdefault("interface", {"displayName": "Personal"})
+    marketplace.setdefault("plugins", [])
+
+    # Replace any stale entry for this plugin.
+    marketplace["plugins"] = [p for p in marketplace["plugins"] if p.get("name") != name]
+    marketplace["plugins"].append({
+        "name": name,
+        "source": {"source": "local", "path": str(install_dir)},
+        "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+        "category": category,
+    })
+
+    marketplace_path.write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+    return True
 
 
 def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
@@ -128,6 +343,10 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
                         on_disk = json.loads(global_path.read_text(encoding="utf-8"))
                     except Exception as parse_err:
                         raise ValueError(f"Existing configuration file contains invalid JSON: {parse_err}")
+
+                # Strip stale entries from previous installs before merging.
+                if on_disk:
+                    on_disk = strip_managed_hooks(on_disk, _MANAGED_HOOK_SCRIPTS)
 
                 final_config = merge_hook_configs(on_disk, result.merged_config)
                 global_path.parent.mkdir(parents=True, exist_ok=True)
@@ -262,6 +481,17 @@ def main() -> int:
         print(f"Installing from source → {install_dir} ...")
         install_from_source(source_root, install_dir)
         print(f"Installed to {install_dir}")
+
+    # ── plugin registration step ──────────────────────────────────────────────
+    if register_claude_plugin(install_dir):
+        print(f"Registered plugin with Claude Code        → {Path.home() / '.claude' / 'plugins' / 'cache' / 'local'}")
+    if register_antigravity_plugin(install_dir):
+        print(f"Registered plugin with Antigravity IDE    → {Path.home() / '.gemini' / 'antigravity-ide' / 'plugins'}")
+    if register_antigravity_config_plugin(install_dir):
+        print(f"Registered plugin with Antigravity global → {Path.home() / '.gemini' / 'config' / 'plugins'}")
+    if register_codex_plugin(install_dir):
+        print(f"Registered plugin in Codex marketplace    → {Path.home() / '.agents' / 'plugins' / 'marketplace.json'}")
+        print(f"  ⚠  Run once to activate Codex skills:  codex plugin add codex-workflows-plugin@personal")
 
     # ── wire step ─────────────────────────────────────────────────────────────
     if args.target:

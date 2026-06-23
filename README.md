@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.2.7** — Enforces YouTrack timer start/stop, spent time logging, git safety on ticket start, and bypasses the testing lane straight to Done/Fixed. Supports standardized issue template scaffolding and recursive directory sync.
+> **v0.2.8** — Installer now registers the plugin with Claude Code on every bootstrap run (skills appear in the plugin manager after session restart). Hook wiring is idempotent — stale entries from previous installs are stripped before re-wiring.
 
 ## Purpose
 
@@ -80,10 +80,10 @@ The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every age
 
 ### Step 1 — Bootstrap the plugin (one-time, per machine)
 
-Download the [latest release zip](https://github.com/theocarranza/codex-workflows-plugin/releases/latest) and run the bootstrap script to install the plugin to `~/.codex-workflows/`:
+Download the [latest release zip](https://github.com/theocarranza/codex-workflows-plugin/releases/latest) and run the bootstrap script:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-0.2.3.zip
+python3 bootstrap.py codex-workflows-plugin-<version>.zip
 ```
 
 Or, if you prefer to work from a clone:
@@ -96,13 +96,25 @@ python3 -m scripts.installer.bootstrap
 
 No additional Python dependencies are needed — the plugin uses only the standard library.
 
+Bootstrap does two things automatically:
+
+1. **Installs the runtime** to `~/.codex-workflows/` (the stable location hook commands reference).
+2. **Registers the plugin with Claude Code** by copying the skills tree into `~/.claude/plugins/cache/local/codex-workflows-plugin/<version>/` and adding an entry to `~/.claude/plugins/installed_plugins.json`. After this, the plugin appears in Claude's plugin manager and its skills are available to any Claude session.
+
+> **After bootstrapping, restart your Claude session** (close and reopen the IDE panel or CLI) for the newly registered skills to appear.
+
 ### Step 2 — Wire your agent host(s)
 
 Run bootstrap with `--target` to wire all hosts in one command. The installer knows each host's global config location — no `--dest` needed:
 
 ```bash
-# Wire all supported hosts (global config — no project path needed)
-python3 bootstrap.py codex-workflows-plugin-0.2.6.zip --target all-agents
+python3 bootstrap.py codex-workflows-plugin-<version>.zip --target all-agents
+```
+
+Or from source:
+
+```bash
+python3 -m scripts.installer.bootstrap --target all-agents
 ```
 
 The plugin auto-discovers each host's config location:
@@ -116,14 +128,14 @@ The plugin auto-discovers each host's config location:
 | `antigravity-cli` | `~/.gemini/antigravity-cli/settings.json` | `BeforeTool` |
 | `all-agents` | all five above | — |
 
-Existing hooks in each file are preserved non-destructively.
+Hook wiring is idempotent — re-running bootstrap strips any stale entries from previous installs before writing the fresh hook, so running it multiple times is safe.
 
 ### Step 2b — Wire a specific project (optional)
 
 To add project-level hooks alongside the global ones, pass `--dest`:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-0.2.6.zip --target all-agents --dest /path/to/your/project
+python3 bootstrap.py codex-workflows-plugin-<version>.zip --target all-agents --dest /path/to/your/project
 ```
 
 This also syncs `.agent/workflows/*.md` and `.agent/rules/*.md` into the project.
@@ -138,7 +150,7 @@ python3 ~/.codex-workflows/scripts/installer/cli.py --target claude --output /tm
 
 ### Updating the plugin
 
-Re-run bootstrap with the new zip — it replaces `~/.codex-workflows/` and re-wires in one step:
+Re-run bootstrap with the new zip — it replaces `~/.codex-workflows/`, refreshes the Claude plugin cache, and re-wires all hooks in one step:
 
 ```bash
 python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agents
@@ -152,7 +164,7 @@ python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agent
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**76 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying), profiles, and release packager.
+**91 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying), profiles, and release packager.
 
 ---
 

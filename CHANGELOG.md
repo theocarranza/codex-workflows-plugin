@@ -13,6 +13,17 @@ _(nothing yet)_
 
 ---
 
+## [0.2.8] — 2026-06-23
+
+### Added
+- **Claude Code plugin registration** (`scripts/installer/bootstrap.py`): bootstrap now copies the plugin's `skills/` tree into `~/.claude/plugins/cache/local/codex-workflows-plugin/<version>/` and adds a `codex-workflows-plugin@local` entry to `~/.claude/plugins/installed_plugins.json`. The plugin now appears in Claude's plugin manager and all skills are discoverable in any Claude session after restarting. The `installPath` is placed inside the standard Claude cache directory — the same structure used by marketplace plugins — which is required for skills to load.
+- `strip_managed_hooks(config, script_names)` in `bootstrap.py`: strips all hook entries whose command references any of this plugin's known hook scripts before re-wiring. Prevents stale entries (e.g. paths from previous temp directories or old install locations) from accumulating across bootstrap runs.
+
+### Fixed
+- **Hook deduplication** (`scripts/installer/merge.py`): `deep_merge` previously concatenated hook-group lists unconditionally, causing a new duplicate hook entry to be appended to the target config on every bootstrap run. Hook-group lists (arrays whose elements each contain a `"hooks"` key) are now deduplicated by command string — only the first occurrence of each unique command is kept. Existing configs with accumulated duplicates are cleaned on the next bootstrap run via `strip_managed_hooks`.
+
+---
+
 ## [0.2.7] — 2026-06-21
 
 ### Added
