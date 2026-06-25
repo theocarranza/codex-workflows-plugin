@@ -13,6 +13,14 @@ _(nothing yet)_
 
 ---
 
+## [0.3.0] — 2026-06-25
+
+### Added
+- **`review-pr` skill** (`skills/review-pr/`): four-phase skill that retrieves Azure DevOps pull request review threads, classifies each comment as comply or reject, presents a structured report for user review, then acts on confirmed decisions — applying code edits for comply items and posting rejection replies for reject items. Thread status is never mutated; only a reply is added. Results are persisted to `AI_Codex/Agent_Reports/YYYY-MM-DD-pr-review-<PR#>.md`.
+- **`.mcp.json`**: Azure DevOps MCP server config (`@azure-devops/mcp`, org `bhave-tecnologia-comportamental`) for local development of `review-pr`.
+
+---
+
 ## [0.2.8] — 2026-06-23
 
 ### Added

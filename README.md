@@ -22,10 +22,25 @@ scripts/
 ├── adapters/             # 4 host adapters: codex, gemini, claude, antigravity
 ├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py)
 └── profiles/             # Workspace profiles (v0.3 scaffolding — not yet wired into runtime)
-skills/                   # 7 skill folders consumed by agent hosts
+skills/                   # 8 skill folders consumed by agent hosts
 .agent/workflows/         # 12 workflow guides synced to target projects on install
 .agent/rules/             # 27 coding & governance rule files synced to target projects
 ```
+
+## Skills
+
+| Skill | Description |
+|---|---|
+| `start-ticket` | Validates and activates a ticket from `Ready/` to `Active/`, enforcing git safety and YouTrack state. |
+| `resolve-ticket` | Closes or resolves an active ticket, enforcing YouTrack timer stop and spent time. |
+| `commit-prep` | Guides atomic commits following conventional-commit conventions. |
+| `automated-tests` | Runs the test suite and reports results in a structured format. |
+| `repository-sync` | Rebases the current branch onto the latest `origin/<base>`. |
+| `bootstrap` | One-time plugin install and host wiring. |
+| `review-pr` | Retrieves Azure DevOps PR review threads, classifies each as comply or reject, presents a report for user confirmation, applies code edits for comply items, and posts rejection replies to threads (status never mutated). |
+| `codex_workflows` | Core hook enforcement script — not invoked directly. |
+
+---
 
 ## Packaging Boundary
 
