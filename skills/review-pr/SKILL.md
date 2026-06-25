@@ -12,7 +12,6 @@ allowed-tools: >
   Read Write Edit Glob Grep Bash
   mcp__azure-devops__repo_get_pull_request_by_id
   mcp__azure-devops__repo_list_pull_request_threads
-  mcp__azure-devops__repo_list_pull_request_thread_comments
   mcp__azure-devops__repo_get_pull_request_changes
   mcp__azure-devops__repo_reply_to_comment
 ---
@@ -47,7 +46,7 @@ Strip `refs/heads/` prefix from branch names returned by Azure APIs.
 
 Call `mcp__azure-devops__repo_get_pull_request_by_id` with `repositoryId` = inferred repo name, `pullRequestId` = PR number.
 
-Extract: `title`, `targetRefName` (strip `refs/heads/`), `createdBy.displayName`.
+Extract: `title`, `description`, `targetRefName` (strip `refs/heads/`), `createdBy.displayName`.
 
 If this call fails, STOP and report: `"INGEST failed — could not fetch PR #<n>: <error>"`. Do not proceed.
 
@@ -104,7 +103,7 @@ Read `./references/report-format.md` for the exact terminal output template befo
 
 1. Print the full classification report using the template in `report-format.md`.
 2. Wait for user input.
-3. Apply any adjustments the user specifies (flip, change action/reason, skip).
+3. Apply any adjustments the user specifies — accepted verbs: flip / change action / change reason / skip (see full table in report-format.md).
 4. Re-print the updated list.
 5. Ask: `"Confirmed? (yes to proceed to ACT, or make further changes)"`
 6. Wait for confirmation before proceeding.
