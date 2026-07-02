@@ -1,0 +1,15 @@
+{
+  "name": "local",
+  "owner": {
+    "name": "Théo Carranza"
+  },
+  "description": "Local plugin marketplace for codex-workflows-plugin.",
+  "plugins": [
+    {
+      "name": "codex-workflows-plugin",
+      "source": "./",
+      "description": "Client-adaptive workflow and enforcement plugin for Codex-style agent hosts.",
+      "version": "0.3.0"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "resolve-ticket",
+  "version": "1.0.0",
+  "description": "Resolve a ticket and archive the work in AI_Codex.",
+  "input_schema": {
+    "type": "object",
+    "properties": {}
+  },
+  "output_signature": {
+    "type": "object",
+    "properties": {}
+  },
+  "tools": []
+}

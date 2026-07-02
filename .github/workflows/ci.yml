@@ -18,7 +18,7 @@ jobs:
           python-version: "3.11"
 
       - name: Validate Codex plugin
-        run: python3 /home/agentrick/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
+        run: python3 scripts/validate_plugin.py .
 
       - name: Run tests
         run: python3 -m unittest -v

@@ -6,7 +6,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from scripts.installer.bootstrap import INSTALL_DIR, install_from_source, install_from_zip
+from scripts.installer.bootstrap import INSTALL_DIR, install_from_source, install_from_zip, register_claude_plugin
 
 
 PLUGIN_ROOT = Path(__file__).parent.parent.parent
@@ -67,6 +67,44 @@ class TestInstallFromSource(unittest.TestCase):
         output = json.loads(result.stdout)
         cmd = output["mergedConfig"]["codex-enforcer"]["PreToolUse"][0]["hooks"][0]["command"]
         self.assertIn(str(self.dest), cmd, "hook command should reference the installed dest, not the source repo")
+
+
+    def test_copies_commands_dir(self):
+        install_from_source(PLUGIN_ROOT, self.dest)
+
+        self.assertTrue((self.dest / "commands" / "review-pr.md").exists())
+
+
+class TestRegisterClaudePlugin(unittest.TestCase):
+    def test_copies_skills_and_commands_into_claude_cache(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as install_dir, tempfile.TemporaryDirectory() as fake_home:
+            root = Path(install_dir)
+            manifest = {
+                "name": "codex-workflows-plugin",
+                "version": "9.9.9-test",
+                "description": "test",
+                "author": {"name": "test"},
+            }
+            (root / ".codex-plugin").mkdir()
+            (root / ".codex-plugin" / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (root / "skills" / "review-pr").mkdir(parents=True)
+            (root / "skills" / "review-pr" / "manifest.json").write_text("{}", encoding="utf-8")
+            (root / "commands").mkdir()
+            (root / "commands" / "review-pr.md").write_text("# review-pr", encoding="utf-8")
+
+            fake_home_path = Path(fake_home)
+            with patch.object(Path, "home", return_value=fake_home_path):
+                self.assertTrue(register_claude_plugin(root))
+
+            cache = fake_home_path / ".claude" / "plugins" / "cache" / "local" / "codex-workflows-plugin" / "9.9.9-test"
+            self.assertTrue((cache / "skills" / "review-pr" / "manifest.json").exists())
+            self.assertTrue((cache / "commands" / "review-pr.md").exists())
+            self.assertTrue((cache / "plugin.json").exists())
+
+            registry = json.loads((fake_home_path / ".claude" / "plugins" / "installed_plugins.json").read_text())
+            self.assertIn("codex-workflows-plugin@local", registry["plugins"])
 
 
 class TestInstallFromZip(unittest.TestCase):

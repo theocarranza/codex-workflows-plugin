@@ -20,7 +20,7 @@ allowed-tools: >
 
 Classify Azure DevOps PR review threads and act on the results. Load reference files as each phase needs them.
 
-References (in `./references/`):
+References (in `references/`):
 - `azure-pr-mechanics.md` — exact MCP tool names, parameters, and gotchas.
 - `report-format.md` — terminal output template and vault note template.
 
@@ -28,7 +28,7 @@ References (in `./references/`):
 
 ## PHASE 1 — INGEST
 
-Read `./references/azure-pr-mechanics.md` before making any MCP calls.
+Read `references/azure-pr-mechanics.md` before making any MCP calls.
 
 **Input:** PR number passed as the skill argument (e.g. `42`). If multiple numbers given, process only the first and warn: `"review-pr processes one PR per invocation."`.
 
@@ -99,7 +99,7 @@ Proceed to PHASE 3 once all threads are classified.
 
 ## PHASE 3 — PRESENT
 
-Read `./references/report-format.md` for the exact terminal output template before printing.
+Read `references/report-format.md` for the exact terminal output template before printing.
 
 1. Print the full classification report using the template in `report-format.md`.
 2. Wait for user input.
@@ -114,7 +114,7 @@ Do not proceed to ACT until the user explicitly confirms.
 
 ## PHASE 4 — ACT
 
-Read `./references/azure-pr-mechanics.md` before making any MCP calls.
+Read `references/azure-pr-mechanics.md` before making any MCP calls.
 
 Execute confirmed items only. Process comply items first, then reject items.
 
@@ -139,7 +139,7 @@ Print ACT outcomes to terminal using the template in `report-format.md`.
 
 ## PERSIST
 
-Read `./references/report-format.md` for the vault note template before writing.
+Read `references/report-format.md` for the vault note template before writing.
 
 Write the vault note to:
 ```
