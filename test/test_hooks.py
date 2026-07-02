@@ -21,9 +21,9 @@ class TestHooksAndStream(unittest.TestCase):
 
     @patch('builtins.input', return_value='IMPLEMENTATION APPROVED')
     def test_authorization_hook_flow(self, mock_input):
-        # Capture stdout to verify cli_ui_hook
+        # Capture stderr to verify cli_ui_hook (stdout is reserved for MCP JSON-RPC).
         captured_output = StringIO()
-        sys.stdout = captured_output
+        sys.stderr = captured_output
         
         # 1. Spawn task
         self.stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": "task_c"}))
@@ -37,8 +37,8 @@ class TestHooksAndStream(unittest.TestCase):
         # This will immediately change the state back to READY.
         self.stream.dispatch(Event(type="TaskFailedEvent", payload={"task_id": "task_c", "critique": "Error 3"}))
         
-        # Restore stdout
-        sys.stdout = sys.__stdout__
+        # Restore stderr
+        sys.stderr = sys.__stderr__
         
         # Verify final state
         final_task = self.stream.state.tasks["task_c"]

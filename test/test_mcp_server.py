@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from scripts.orchestrator.engine import OrchestratorEngine
-from scripts.orchestrator.mcp_server import process_message
+from scripts.orchestrator.mcp_server import default_skills_dir, process_message, resolve_skills_dir
 
 
 class TestMCPServer(unittest.TestCase):
@@ -55,6 +55,11 @@ class TestMCPServer(unittest.TestCase):
         self.assertEqual(tools[0]["name"], "mock-skill")
         self.assertEqual(tools[0]["description"], "A mock skill for testing")
         self.assertIn("arg1", tools[0]["inputSchema"]["properties"])
+
+    def test_resolve_skills_dir_uses_repo_default(self):
+        resolved = resolve_skills_dir()
+        self.assertTrue(resolved.is_dir())
+        self.assertEqual(resolved, default_skills_dir())
 
     def test_tools_call(self):
         request = json.dumps(

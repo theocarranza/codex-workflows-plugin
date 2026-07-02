@@ -62,6 +62,27 @@ class TestOrchestratorEngineE2E(unittest.TestCase):
         self.assertEqual(result.output.get("mode"), "instructions")
         self.assertIn("prompt", result.output)
         self.assertIn("Do the thing.", result.output["prompt"])
+        self.assertEqual(result.output.get("attempt"), 1)
+
+    def test_identical_retry_output_fails_fast(self):
+        self._write_skill(
+            "strict-skill",
+            {
+                "name": "strict-skill",
+                "description": "Requires success flag",
+                "input_schema": {"type": "object", "properties": {}},
+                "output_signature": {
+                    "type": "object",
+                    "required": ["success"],
+                    "properties": {"success": {"type": "boolean"}},
+                },
+            },
+            "# strict\n",
+        )
+        engine = OrchestratorEngine(self.skills_dir, max_retries=3)
+        result = engine.run_tool_call("strict-skill", {})
+        self.assertFalse(result.ok)
+        self.assertIn("success", result.error or "")
 
     def test_mcp_tools_call_round_trip(self):
         init = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})

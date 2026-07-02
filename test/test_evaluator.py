@@ -7,6 +7,7 @@ class TestEvaluator(unittest.TestCase):
             "name": "start-ticket",
             "output_signature": {
                 "type": "object",
+                "required": ["success"],
                 "properties": {
                     "active_ledger_path": {
                         "type": "string"
@@ -32,7 +33,7 @@ class TestEvaluator(unittest.TestCase):
         }
         critiques = evaluate_output(invalid_output, self.manifest)
         self.assertEqual(len(critiques), 1)
-        self.assertIn("Missing expected property 'success' in output.", critiques[0])
+        self.assertIn("Missing required output property 'success'", critiques[0])
 
     def test_evaluate_wrong_type(self):
         invalid_output = {

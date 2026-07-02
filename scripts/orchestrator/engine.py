@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .evaluator import evaluate_output
-from .hooks import cli_ui_hook
+from .hooks import authorization_hook, cli_ui_hook
 from .manifests import manifest_by_name
 from .schema import validate_inputs
 from .state import Event, QueueState, Task, TaskState
@@ -24,48 +24,55 @@ class ToolCallResult:
     state: str | None = None
 
     def to_mcp_content(self) -> list[dict[str, str]]:
-        if self.ok:
-            text = json.dumps(
-                {
-                    "status": "completed",
-                    "task_id": self.task_id,
-                    "output": self.output,
-                },
-                indent=2,
-            )
-        else:
-            text = json.dumps(
-                {
-                    "status": "failed",
-                    "task_id": self.task_id,
-                    "state": self.state,
-                    "error": self.error,
-                },
-                indent=2,
-            )
-        return [{"type": "text", "text": text}]
+        payload = (
+            {
+                "status": "completed",
+                "task_id": self.task_id,
+                "output": self.output,
+            }
+            if self.ok
+            else {
+                "status": "failed",
+                "task_id": self.task_id,
+                "state": self.state,
+                "error": self.error,
+            }
+        )
+        return [{"type": "text", "text": json.dumps(payload, indent=2)}]
 
 
 class OrchestratorEngine:
     """Synchronous skill orchestrator: queue events, execute, evaluate, retry."""
 
-    def __init__(self, skills_dir: str | Path, *, max_retries: int = 3, interactive: bool = False):
+    def __init__(
+        self,
+        skills_dir: str | Path,
+        *,
+        max_retries: int = 3,
+        interactive: bool = False,
+        quiet: bool = False,
+    ):
         self.skills_dir = Path(skills_dir)
         self.max_retries = max_retries
         self.interactive = interactive
+        self.quiet = quiet
         self._manifests = manifest_by_name(self.skills_dir)
 
+    def _subscribe_hooks(self, stream: OrchestratorStream) -> None:
+        if not self.quiet:
+            stream.subscribe(cli_ui_hook)
+        if self.interactive:
+            stream.subscribe(authorization_hook)
+
     def list_tools(self) -> list[dict[str, Any]]:
-        tools = []
-        for manifest in self._manifests.values():
-            tools.append(
-                {
-                    "name": manifest.get("name"),
-                    "description": manifest.get("description"),
-                    "inputSchema": manifest.get("input_schema", {"type": "object", "properties": {}}),
-                }
-            )
-        return tools
+        return [
+            {
+                "name": manifest.get("name"),
+                "description": manifest.get("description"),
+                "inputSchema": manifest.get("input_schema", {"type": "object", "properties": {}}),
+            }
+            for manifest in self._manifests.values()
+        ]
 
     def run_tool_call(self, name: str, arguments: dict[str, Any] | None) -> ToolCallResult:
         arguments = arguments or {}
@@ -80,9 +87,11 @@ class OrchestratorEngine:
         task_id = f"{name}-{uuid.uuid4().hex[:8]}"
         task = Task(id=task_id, skill_name=name, inputs=arguments)
         stream = OrchestratorStream(QueueState(tasks={task_id: task}))
-        stream.subscribe(cli_ui_hook)
-
+        self._subscribe_hooks(stream)
         stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
+
+        last_output: dict[str, Any] | None = None
+        last_critiques: list[str] = []
 
         while True:
             current = stream.state.tasks[task_id]
@@ -107,7 +116,7 @@ class OrchestratorEngine:
                         task_id=task_id,
                         state=current.state.value,
                     )
-                if current.state == TaskState.READY and current.retry_count < self.max_retries:
+                if current.state == TaskState.READY:
                     stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
                     continue
                 return ToolCallResult(
@@ -119,7 +128,13 @@ class OrchestratorEngine:
                 )
 
             critiques = evaluate_output(output, manifest)
-            if critiques:
+            if not critiques:
+                stream.dispatch(
+                    Event(type="TaskCompletedEvent", payload={"task_id": task_id, "output": output})
+                )
+                return ToolCallResult(ok=True, output=output, task_id=task_id, state=TaskState.COMPLETED.value)
+
+            if critiques == last_critiques and output == last_output:
                 stream.dispatch(
                     Event(
                         type="TaskFailedEvent",
@@ -127,17 +142,6 @@ class OrchestratorEngine:
                     )
                 )
                 current = stream.state.tasks[task_id]
-                if current.state == TaskState.BLOCKED_REQUIRES_REVIEW:
-                    return ToolCallResult(
-                        ok=False,
-                        output=output,
-                        error="; ".join(critiques),
-                        task_id=task_id,
-                        state=current.state.value,
-                    )
-                if current.state == TaskState.READY:
-                    stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
-                    continue
                 return ToolCallResult(
                     ok=False,
                     output=output,
@@ -146,7 +150,31 @@ class OrchestratorEngine:
                     state=current.state.value,
                 )
 
+            last_output = output
+            last_critiques = list(critiques)
             stream.dispatch(
-                Event(type="TaskCompletedEvent", payload={"task_id": task_id, "output": output})
+                Event(
+                    type="TaskFailedEvent",
+                    payload={"task_id": task_id, "critique": "; ".join(critiques)},
+                )
             )
-            return ToolCallResult(ok=True, output=output, task_id=task_id, state=TaskState.COMPLETED.value)
+            current = stream.state.tasks[task_id]
+            if current.state == TaskState.BLOCKED_REQUIRES_REVIEW:
+                return ToolCallResult(
+                    ok=False,
+                    output=output,
+                    error="; ".join(critiques),
+                    task_id=task_id,
+                    state=current.state.value,
+                )
+            if current.state == TaskState.READY:
+                stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
+                continue
+
+            return ToolCallResult(
+                ok=False,
+                output=output,
+                error="; ".join(critiques),
+                task_id=task_id,
+                state=current.state.value,
+            )

@@ -26,9 +26,12 @@ def execute_skill(
     handler = get_handler(skill_name)
     output = handler(arguments, manifest, instructions)
 
-    if output.get("mode") == "instructions" and "prompt" not in output:
+    if output.get("mode") == "instructions" or "prompt" not in output:
         output = {
             **output,
             "prompt": to_anthropic_dialect(instructions, task.copy_with(state=TaskState.IN_PROGRESS)),
+            "attempt": task.retry_count + 1,
         }
+        if task.critiques:
+            output["reflection_critiques"] = list(task.critiques)
     return output

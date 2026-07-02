@@ -13,6 +13,14 @@ def default_skills_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "skills"
 
 
+def resolve_skills_dir() -> Path:
+    env = os.environ.get("ORCHESTRATOR_SKILLS_DIR", "").strip()
+    if env:
+        path = Path(env)
+        return path.resolve() if not path.is_absolute() else path
+    return default_skills_dir()
+
+
 def handle_list_tools(engine: OrchestratorEngine) -> dict[str, Any]:
     return {"tools": engine.list_tools()}
 
@@ -44,13 +52,10 @@ def process_message(line: str, engine: OrchestratorEngine) -> str:
             name = params.get("name")
             args = params.get("arguments") or {}
             result = engine.run_tool_call(name, args)
-            if result.ok:
-                response["result"] = {"content": result.to_mcp_content()}
-            else:
-                response["result"] = {
-                    "content": result.to_mcp_content(),
-                    "isError": True,
-                }
+            response["result"] = {
+                "content": result.to_mcp_content(),
+                **({} if result.ok else {"isError": True}),
+            }
         elif method == "notifications/initialized":
             return ""
         else:
@@ -62,8 +67,12 @@ def process_message(line: str, engine: OrchestratorEngine) -> str:
 
 
 def main() -> None:
-    skills_dir = Path(os.environ.get("ORCHESTRATOR_SKILLS_DIR", default_skills_dir()))
-    engine = OrchestratorEngine(skills_dir)
+    skills_dir = resolve_skills_dir()
+    if not skills_dir.is_dir():
+        print(f"error: skills directory not found: {skills_dir}", file=sys.stderr)
+        raise SystemExit(1)
+
+    engine = OrchestratorEngine(skills_dir, quiet=True)
     for line in sys.stdin:
         if line.strip():
             res = process_message(line, engine)
