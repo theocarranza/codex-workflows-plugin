@@ -13,6 +13,33 @@ _(nothing yet)_
 
 ---
 
+## [0.4.0] — 2026-07-02
+
+### Added
+- **Slash commands** (`commands/`): user-invocable Claude Code commands for `start-ticket`, `resolve-ticket`, `review-pr`, `commit-prep`, `automated-tests`, `repository-sync`, and `bootstrap`. Copied into the Claude plugin cache on bootstrap alongside skills.
+- **Agentic orchestrator** (`scripts/orchestrator/`): event-sourced skill runner with schema validation, output evaluation, retry/circuit-breaker state machine, and an MCP stdio server (`agentic-orchestrator`). Invoked via `python3 -m scripts.orchestrator.mcp_server`.
+- **Skill manifests** (`skills/*/manifest.json`): MCP-discoverable input schemas and output signatures for orchestrated skills.
+- **`.claude-plugin/`** marketplace metadata for local Claude plugin distribution.
+- **`scripts/validate_plugin.py`**: portable manifest validator used by CI (replaces the machine-specific Codex plugin-creator path).
+- **Bootstrap orchestrator wiring**: `--dest` installs merge an `agentic-orchestrator` entry into the project's `.mcp.json` with absolute `PYTHONPATH` and `ORCHESTRATOR_SKILLS_DIR`.
+
+### Changed
+- **Installer/bootstrap**: copies `commands/` into the Claude plugin cache; warns when Claude plugin registration fails; Antigravity registration handles `OSError` without crashing bootstrap.
+- **Release packager**: includes `commands/` and `.claude-plugin/` in the release archive.
+- **`.mcp.json`**: adds `agentic-orchestrator` server entry for local development (skills dir resolved from module path when env is unset).
+
+### Fixed
+- **Orchestrator stream**: queued event dispatch prevents reentrancy drift when hooks emit nested events (e.g. `AuthorizationReceivedEvent`).
+- **Orchestrator engine**: propagates `max_retries` to the reducer; guards retry loops with `retry_count < max_retries`; fails fast on identical retry output.
+- **Orchestrator MCP server**: rejects non-dict JSON payloads; logs UI hooks to stderr to keep JSON-RPC stdout clean.
+- **Orchestrator evaluator**: honors `output_signature.required`; validates `integer` type; excludes booleans from integer/number checks.
+- **Manifest loader**: skips `manifest.json` files that parse to non-object JSON.
+- **Reducer**: dependency resolution no longer crashes on missing task IDs.
+- **`start-ticket` handler**: creates the active ledger file when a project root env var is set.
+- **`review-pr` command**: thin delegate to `skills/review-pr/SKILL.md` (removes duplicated workflow body).
+
+---
+
 ## [0.3.0] — 2026-06-25
 
 ### Added
