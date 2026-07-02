@@ -69,7 +69,7 @@ class OrchestratorEngine:
             {
                 "name": manifest.get("name"),
                 "description": manifest.get("description"),
-                "inputSchema": manifest.get("input_schema", {"type": "object", "properties": {}}),
+                "inputSchema": manifest.get("input_schema") or {"type": "object", "properties": {}},
             }
             for manifest in self._manifests.values()
         ]
@@ -86,7 +86,7 @@ class OrchestratorEngine:
 
         task_id = f"{name}-{uuid.uuid4().hex[:8]}"
         task = Task(id=task_id, skill_name=name, inputs=arguments)
-        stream = OrchestratorStream(QueueState(tasks={task_id: task}))
+        stream = OrchestratorStream(QueueState(tasks={task_id: task}), max_retries=self.max_retries)
         self._subscribe_hooks(stream)
         stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
 
@@ -116,7 +116,7 @@ class OrchestratorEngine:
                         task_id=task_id,
                         state=current.state.value,
                     )
-                if current.state == TaskState.READY:
+                if current.state == TaskState.READY and current.retry_count < self.max_retries:
                     stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
                     continue
                 return ToolCallResult(
@@ -167,7 +167,7 @@ class OrchestratorEngine:
                     task_id=task_id,
                     state=current.state.value,
                 )
-            if current.state == TaskState.READY:
+            if current.state == TaskState.READY and current.retry_count < self.max_retries:
                 stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": task_id}))
                 continue
 

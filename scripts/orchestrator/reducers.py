@@ -36,7 +36,8 @@ def handle_task_completed(state: QueueState, event: Event) -> QueueState:
         if t.state == TaskState.BLOCKED and task_id in t.dependencies:
             # Check if ALL dependencies for this task are now COMPLETED
             all_deps_completed = all(
-                new_tasks[dep].state == TaskState.COMPLETED for dep in t.dependencies
+                dep in new_tasks and new_tasks[dep].state == TaskState.COMPLETED
+                for dep in t.dependencies
             )
             if all_deps_completed:
                 new_tasks[t_id] = t.copy_with(state=TaskState.READY)

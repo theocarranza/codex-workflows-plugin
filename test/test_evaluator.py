@@ -47,6 +47,30 @@ class TestEvaluator(unittest.TestCase):
         self.assertIn("should be a string", critique_texts)
         self.assertIn("should be a boolean", critique_texts)
 
+    def test_evaluate_integer_rejects_boolean(self):
+        manifest = {
+            "name": "count-skill",
+            "output_signature": {
+                "type": "object",
+                "properties": {"count": {"type": "integer"}},
+            },
+        }
+        critiques = evaluate_output({"count": True}, manifest)
+        self.assertEqual(len(critiques), 1)
+        self.assertIn("should be an integer", critiques[0])
+
+    def test_evaluate_number_rejects_boolean(self):
+        manifest = {
+            "name": "ratio-skill",
+            "output_signature": {
+                "type": "object",
+                "properties": {"ratio": {"type": "number"}},
+            },
+        }
+        critiques = evaluate_output({"ratio": True}, manifest)
+        self.assertEqual(len(critiques), 1)
+        self.assertIn("should be a number", critiques[0])
+
     def test_evaluate_wrong_base_type(self):
         # The schema expects a dictionary/object, not a raw string
         invalid_output = "/vault/Tickets/Active/TICKET-1.md"

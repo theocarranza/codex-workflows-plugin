@@ -79,7 +79,7 @@ class TestOrchestratorEngineE2E(unittest.TestCase):
             },
             "# strict\n",
         )
-        engine = OrchestratorEngine(self.skills_dir, max_retries=3)
+        engine = OrchestratorEngine(self.skills_dir, max_retries=2)
         result = engine.run_tool_call("strict-skill", {})
         self.assertFalse(result.ok)
         self.assertIn("success", result.error or "")

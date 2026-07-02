@@ -61,6 +61,10 @@ class TestMCPServer(unittest.TestCase):
         self.assertTrue(resolved.is_dir())
         self.assertEqual(resolved, default_skills_dir())
 
+    def test_non_dict_json_payload_is_ignored(self):
+        response_str = process_message("123", self.engine)
+        self.assertEqual(response_str, "")
+
     def test_tools_call(self):
         request = json.dumps(
             {

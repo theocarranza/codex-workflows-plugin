@@ -31,7 +31,7 @@ def process_message(line: str, engine: OrchestratorEngine) -> str:
     except json.JSONDecodeError:
         return ""
 
-    if "id" not in msg or "method" not in msg:
+    if not isinstance(msg, dict) or "id" not in msg or "method" not in msg:
         return ""
 
     msg_id = msg["id"]

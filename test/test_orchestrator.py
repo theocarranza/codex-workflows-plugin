@@ -57,5 +57,21 @@ class TestOrchestratorReducers(unittest.TestCase):
         self.assertEqual(state.tasks["task_a"].retry_count, 0, "Retries should be reset")
         self.assertEqual(len(state.tasks["task_a"].critiques), 0, "Critiques should be cleared")
 
+    def test_missing_dependency_does_not_crash_completion(self):
+        state = QueueState(
+            tasks={
+                "task_a": Task(id="task_a", skill_name="parse_ast", state=TaskState.IN_PROGRESS),
+                "task_b": Task(
+                    id="task_b",
+                    skill_name="write_test",
+                    state=TaskState.BLOCKED,
+                    dependencies=["task_a", "missing_task"],
+                ),
+            }
+        )
+        event_complete = Event(type="TaskCompletedEvent", payload={"task_id": "task_a", "output": "done"})
+        state = reduce_queue_state(state, event_complete)
+        self.assertEqual(state.tasks["task_b"].state, TaskState.BLOCKED)
+
 if __name__ == '__main__':
     unittest.main()

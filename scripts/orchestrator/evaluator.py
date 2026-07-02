@@ -30,7 +30,13 @@ def evaluate_output(output: Any, manifest: dict[str, Any]) -> list[str]:
             critiques.append(f"Property '{prop_name}' should be a string, got {type(actual_value).__name__}.")
         elif expected_prop_type == "boolean" and not isinstance(actual_value, bool):
             critiques.append(f"Property '{prop_name}' should be a boolean, got {type(actual_value).__name__}.")
-        elif expected_prop_type == "number" and not isinstance(actual_value, (int, float)):
+        elif expected_prop_type == "integer" and (
+            not isinstance(actual_value, int) or isinstance(actual_value, bool)
+        ):
+            critiques.append(f"Property '{prop_name}' should be an integer, got {type(actual_value).__name__}.")
+        elif expected_prop_type == "number" and (
+            not isinstance(actual_value, (int, float)) or isinstance(actual_value, bool)
+        ):
             critiques.append(f"Property '{prop_name}' should be a number, got {type(actual_value).__name__}.")
 
     return critiques

@@ -56,5 +56,25 @@ class TestHooksAndStream(unittest.TestCase):
         self.assertIn("Circuit Breaker tripped for task 'task_c'", output_str)
         self.assertIn("Authorization received for task 'task_c'", output_str)
 
+    def test_nested_dispatch_uses_latest_state(self):
+        def outer_hook(state, event, stream):
+            if event.type == "TaskFailedEvent" and state.tasks["task_c"].state == TaskState.BLOCKED_REQUIRES_REVIEW:
+                stream.dispatch(
+                    Event(
+                        type="AuthorizationReceivedEvent",
+                        payload={"task_id": "task_c", "token": "IMPLEMENTATION APPROVED"},
+                    )
+                )
+
+        stream = OrchestratorStream(self.initial_state, max_retries=3)
+        stream.subscribe(outer_hook)
+        stream.dispatch(Event(type="TaskSpawnedEvent", payload={"task_id": "task_c"}))
+        for i in range(3):
+            stream.dispatch(Event(type="TaskFailedEvent", payload={"task_id": "task_c", "critique": f"err {i}"}))
+
+        self.assertEqual(stream.state.tasks["task_c"].state, TaskState.READY)
+        event_types = [event.type for event in stream.state.events_history]
+        self.assertIn("AuthorizationReceivedEvent", event_types)
+
 if __name__ == '__main__':
     unittest.main()

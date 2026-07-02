@@ -19,7 +19,9 @@ def read_manifests(skills_dir: str | Path) -> list[dict[str, Any]]:
         if not manifest_file.is_file():
             continue
         try:
-            manifests.append(json.loads(manifest_file.read_text(encoding="utf-8")))
+            data = json.loads(manifest_file.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                manifests.append(data)
         except (json.JSONDecodeError, OSError):
             continue
     return manifests
