@@ -1,0 +1,20 @@
+{
+  "name": "review-pr",
+  "version": "1.0.0",
+  "description": "Retrieve Azure DevOps pull request review threads, classify each as comply or reject, present a consolidated report for user confirmation, apply code edits, and post replies.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "pr_number": {
+        "type": "string",
+        "description": "The PR number to review."
+      }
+    },
+    "required": ["pr_number"]
+  },
+  "output_signature": {
+    "type": "object",
+    "properties": {}
+  },
+  "tools": []
+}

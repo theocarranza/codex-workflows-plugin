@@ -32,7 +32,7 @@ _MANAGED_HOOK_SCRIPTS = {
     "claude_enforce_hook.py",
 }
 
-_RUNTIME_DIRS = ["scripts", "skills", ".agent", "hooks", ".codex-plugin"]
+_RUNTIME_DIRS = ["scripts", "skills", "commands", ".agent", "hooks", ".codex-plugin"]
 
 
 def install_from_zip(zip_path: Path, dest: Path) -> None:
@@ -108,17 +108,37 @@ def register_claude_plugin(install_dir: Path) -> bool:
     # Copy into the Claude plugin cache under a "local" marketplace bucket.
     cache_dir = Path.home() / ".claude" / "plugins" / "cache" / "local" / name / version
     if cache_dir.exists():
-        shutil.rmtree(cache_dir)
-    cache_dir.mkdir(parents=True)
+        try:
+            shutil.rmtree(cache_dir)
+        except OSError:
+            return False
+    try:
+        cache_dir.mkdir(parents=True)
+    except OSError:
+        return False
 
     # Copy skills directory.
     src_skills = install_dir / "skills"
     if src_skills.is_dir():
-        shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        try:
+            shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
+
+    # Copy commands directory (user-invocable slash commands).
+    src_commands = install_dir / "commands"
+    if src_commands.is_dir():
+        try:
+            shutil.copytree(src_commands, cache_dir / "commands", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
 
     # Write a minimal plugin.json (no extra fields) matching the format Claude expects.
     clean_manifest = {k: manifest[k] for k in ("name", "description", "version", "author") if k in manifest}
-    (cache_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+    try:
+        (cache_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+    except OSError:
+        return False
 
     registry_path = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
     registry: dict = {"version": 2, "plugins": {}}
@@ -141,7 +161,11 @@ def register_claude_plugin(install_dir: Path) -> bool:
         "lastUpdated": now,
     }]
 
-    registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    try:
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    except OSError:
+        return False
     return True
 
 

@@ -21,6 +21,7 @@ class TestReleasePackager(unittest.TestCase):
             with zipfile.ZipFile(archive_path, "r") as archive:
                 names = set(archive.namelist())
                 self.assertIn(".codex-plugin/plugin.json", names)
+                self.assertTrue(any(name.startswith("commands/") for name in names))
                 self.assertIn("release-manifest.json", names)
                 manifest = json.loads(archive.read("release-manifest.json").decode("utf-8"))
                 self.assertEqual(manifest["package_name"], "codex-workflows-plugin")

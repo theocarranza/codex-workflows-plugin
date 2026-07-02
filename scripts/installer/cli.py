@@ -44,20 +44,32 @@ def _hook_command(target: Target, plugin_root: Path) -> str:
 def sync_shared_assets(dest_root: str | Path) -> None:
     """Copies workflow and rules markdown files from the plugin into a destination project.
 
-    Syncs `.agent/workflows/` and `.agent/rules/` from the plugin root
-    to the corresponding directories under [dest_root]. Missing destination
-    directories are created automatically. Existing files are overwritten.
+    Prefers ``.agent/workflows`` and ``.agent/rules`` under the plugin root.
+    Falls back to ``skills/codex_workflows/resources`` (workflows + templates)
+    and ``skills/codex_workflows/rules`` when the canonical ``.agent/`` tree is absent.
     """
     plugin_root = _plugin_root()
     dest = Path(dest_root)
 
-    for rel in ("workflows", "rules"):
-        src_dir = plugin_root / ".agent" / rel
-        dst_dir = dest / ".agent" / rel
-        if not src_dir.is_dir():
-            continue
+    workflow_src = plugin_root / ".agent" / "workflows"
+    if not workflow_src.is_dir():
+        workflow_src = plugin_root / "skills" / "codex_workflows" / "resources"
+    if workflow_src.is_dir():
+        dst_dir = dest / ".agent" / "workflows"
         dst_dir.mkdir(parents=True, exist_ok=True)
-        for item in src_dir.iterdir():
+        for item in workflow_src.iterdir():
+            if item.is_file() and item.suffix == ".md":
+                shutil.copy2(item, dst_dir / item.name)
+            elif item.is_dir():
+                shutil.copytree(item, dst_dir / item.name, dirs_exist_ok=True)
+
+    rules_src = plugin_root / ".agent" / "rules"
+    if not rules_src.is_dir():
+        rules_src = plugin_root / "skills" / "codex_workflows" / "rules"
+    if rules_src.is_dir():
+        dst_dir = dest / ".agent" / "rules"
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for item in rules_src.iterdir():
             if item.is_file() and item.suffix == ".md":
                 shutil.copy2(item, dst_dir / item.name)
             elif item.is_dir():

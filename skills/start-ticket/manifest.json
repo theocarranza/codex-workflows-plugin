@@ -1,0 +1,27 @@
+{
+  "name": "start-ticket",
+  "version": "1.0.0",
+  "description": "Start a ticket by creating the active ledger and session record.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "string",
+        "description": "The ID of the ticket to start (e.g., from YouTrack)."
+      }
+    },
+    "required": [
+      "ticket_id"
+    ]
+  },
+  "output_signature": {
+    "type": "object",
+    "properties": {
+      "active_ledger_path": {
+        "type": "string",
+        "description": "The file path to the newly created active ledger."
+      }
+    }
+  },
+  "tools": []
+}

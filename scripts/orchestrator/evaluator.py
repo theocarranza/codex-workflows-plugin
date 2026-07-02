@@ -1,0 +1,41 @@
+from typing import Dict, Any, List
+
+def evaluate_output(output: Any, manifest: Dict[str, Any]) -> List[str]:
+    """
+    Evaluates the output of a task against the expected output signature in the skill's manifest.
+    Returns a list of critiques (strings) if validation fails, or an empty list if successful.
+    """
+    critiques = []
+    expected_signature = manifest.get("output_signature", {})
+    
+    # If no output signature is defined, we assume success
+    if not expected_signature:
+        return critiques
+        
+    expected_type = expected_signature.get("type", "object")
+    
+    # 1. Base Type validation
+    if expected_type == "object" and not isinstance(output, dict):
+        critiques.append(f"Expected output to be a dictionary/object, but got {type(output).__name__}.")
+        return critiques # Early exit if fundamental type is wrong
+        
+    # 2. Property schema validation
+    if expected_type == "object":
+        expected_properties = expected_signature.get("properties", {})
+        
+        for prop_name, prop_schema in expected_properties.items():
+            if prop_name not in output:
+                critiques.append(f"Missing expected property '{prop_name}' in output.")
+            else:
+                actual_value = output[prop_name]
+                expected_prop_type = prop_schema.get("type")
+                
+                # Basic type checking
+                if expected_prop_type == "string" and not isinstance(actual_value, str):
+                    critiques.append(f"Property '{prop_name}' should be a string, got {type(actual_value).__name__}.")
+                elif expected_prop_type == "boolean" and not isinstance(actual_value, bool):
+                    critiques.append(f"Property '{prop_name}' should be a boolean, got {type(actual_value).__name__}.")
+                elif expected_prop_type == "number" and not isinstance(actual_value, (int, float)):
+                    critiques.append(f"Property '{prop_name}' should be a number, got {type(actual_value).__name__}.")
+                
+    return critiques
