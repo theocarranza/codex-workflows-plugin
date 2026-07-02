@@ -13,6 +13,25 @@ _(nothing yet)_
 
 ---
 
+## [0.5.0] — 2026-07-02
+
+### Added
+- **Cursor IDE support**: `cursor` installer target wires `~/.cursor/hooks.json`; `cursor_adapter.py` and `cursor_enforce_hook.py` normalize Cursor `preToolUse` payloads (Read/Write/Shell tool names).
+- **`write-spec` skill**: Actor-Critic spec generation with templates (RFC, ADR, design doc, tech spec, SRS, implementation plan, bugfix spec, API contract), mistakes repository, and circuit breaker.
+- **Generic reflection engine** (`scripts/artifact_reflection.py`): shared `ReflectionEngine`, `CriticProfile`, and vault-wide `_mistakes/mistakes.json` (legacy `Specs/_mistakes/` still read).
+- **`resolve-ticket` Actor-Critic workflow**: resolution report at `<vault>/Specs/<slug>/resolution-report.md`, grounded on spec files and ticket ledger before archival.
+- **`start-ticket` spec hook**: returns `write_spec_directive` when required spec kinds are missing under `<vault>/Specs/<slug>/`.
+- **Spec/resolution runtimes**: `spec_runtime.py`, `resolution_runtime.py`, `spec_start_hook.py`, `resolve_ticket_hook.py`, and orchestrator handlers for `write-spec` and `resolve-ticket`.
+
+### Changed
+- **`start-ticket` / `resolve-ticket` manifests** bumped to v1.1.0 with input schemas and output signatures for orchestrator evaluation.
+- **Hook runtime**: honors `CURSOR_PROJECT_DIR` for project root; recognizes Cursor write/shell tool names.
+
+### Fixed
+- **Bootstrap Codex registration**: `register_codex_plugin()` catches `OSError` when `~/.agents/plugins/marketplace.json` is not writable — install completes with a warning instead of exiting non-zero.
+
+---
+
 ## [0.4.0] — 2026-07-02
 
 ### Added

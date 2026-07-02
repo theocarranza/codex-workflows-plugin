@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.4.0** — Adds slash commands, an agentic orchestrator MCP server, skill manifests for MCP discovery, and bootstrap wiring for project-level `.mcp.json`. Orchestrator stream dispatch, retry limits, and manifest validation are hardened. **120 tests**, all passing.
+> **v0.5.0** — Adds Cursor IDE hook wiring, Actor-Critic `write-spec` and `resolve-ticket` workflows with a shared reflection engine, and start-ticket spec generation hooks. Bootstrap tolerates unreadable Codex marketplace paths. **147 tests**, all passing.
 
 ## Purpose
 
@@ -19,8 +19,9 @@ scripts/
 ├── hook_runtime.py       # Entry point — orchestrates all policy checks
 ├── ticket_runtime.py     # Path extraction, YouTrack transcript scanner, bugfix inference
 ├── policy/               # Pure policy engine (engine.py, events.py, git_utils.py) — no I/O
-├── adapters/             # 4 host adapters: codex, gemini, claude, antigravity
+├── adapters/             # 5 host adapters: codex, gemini, claude, antigravity, cursor
 ├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py, bootstrap.py)
+├── artifact_reflection.py # Shared Actor-Critic reflection engine for skill artifacts
 ├── orchestrator/         # Event-sourced skill runner + MCP stdio server
 ├── validate_plugin.py    # Portable manifest validator (used by CI)
 └── profiles/             # Workspace profiles (scaffolding — not yet wired into runtime)
@@ -35,7 +36,7 @@ skills/                   # Skill folders + manifest.json for orchestrator MCP d
 | Skill / Command | Description |
 |---|---|
 | `start-ticket` | Validates and activates a ticket from `Ready/` to `Active/`, enforcing git safety and YouTrack state. |
-| `resolve-ticket` | Closes or resolves an active ticket, enforcing YouTrack timer stop and spent time. |
+| `resolve-ticket` | Actor-Critic resolution report grounded on specs, then archive; enforces YouTrack timer stop and spent time. |
 | `commit-prep` | Guides atomic commits following conventional-commit conventions. |
 | `automated-tests` | Runs the test suite and reports results in a structured format. |
 | `repository-sync` | Rebases the current branch onto the latest `origin/<base>`. |
@@ -216,7 +217,7 @@ python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agent
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**120 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime, installer (dry-run and live `--dest` write), orchestrator (state machine, MCP server, evaluator, hooks), profiles, and release packager.
+**147 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime, spec/resolution reflection, installer (dry-run and live `--dest` write), orchestrator (state machine, MCP server, evaluator, hooks), profiles, and release packager.
 
 CI also runs `python3 scripts/validate_plugin.py .` to verify the plugin manifest and skills layout.
 
