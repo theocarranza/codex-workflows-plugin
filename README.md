@@ -40,6 +40,7 @@ skills/                   # Skill folders + manifest.json for orchestrator MCP d
 | `automated-tests` | Runs the test suite and reports results in a structured format. |
 | `repository-sync` | Rebases the current branch onto the latest `origin/<base>`. |
 | `bootstrap` | One-time plugin install and host wiring. |
+| `write-spec` | Actor-Critic spec generation (RFC, ADR, design doc, tech spec, SRS, etc.) under `<vault>/Specs/`. Triggered by `/start-ticket` when specs are missing. |
 | `review-pr` | Retrieves Azure DevOps PR review threads, classifies each as comply or reject, presents a report for user confirmation, applies code edits for comply items, and posts rejection replies to threads (status never mutated). |
 | `codex_workflows` | Core hook enforcement script — not invoked directly. |
 
@@ -172,11 +173,12 @@ The plugin auto-discovers each host's config location:
 | Target | Global config wired | Hook event |
 |---|---|---|
 | `claude` | `~/.claude/settings.json` | `PreToolUse` |
+| `cursor` | `~/.cursor/hooks.json` | `preToolUse` |
 | `gemini` | `~/.gemini/settings.json` (Deprecated) | `BeforeTool` |
 | `codex` | `~/.gemini/config/hooks.json` | `PreToolUse` |
 | `antigravity` | `<ide-install>/.agents/hooks.json` (auto-discovered) | `PreToolUse` |
 | `antigravity-cli` | `~/.gemini/antigravity-cli/settings.json` | `BeforeTool` |
-| `all-agents` | all five above | — |
+| `all-agents` | all six above (skips hosts not installed) | — |
 
 Hook wiring is idempotent — re-running bootstrap strips any stale entries from previous installs before writing the fresh hook, so running it multiple times is safe.
 

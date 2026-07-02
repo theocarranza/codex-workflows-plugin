@@ -81,6 +81,18 @@ class TestInstallerTargets(unittest.TestCase):
             _expected_cmd("claude_enforce_hook.py"),
         )
 
+    def test_cursor_target_installs_hooks_json(self):
+        result = install(target="cursor")
+
+        self.assertFalse(result.written_codex_config)
+        self.assertTrue(result.written_shared_assets)
+        self.assertTrue(result.written_target_config)
+        self.assertEqual(result.config_paths, (".cursor/hooks.json",))
+        self.assertEqual(
+            result.merged_config["hooks"]["preToolUse"][0]["command"],
+            _expected_cmd("cursor_enforce_hook.py"),
+        )
+
     def test_merge_hook_configs_preserves_existing_hooks(self):
         existing = {
             "hooks": {

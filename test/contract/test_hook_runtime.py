@@ -4,10 +4,12 @@ from scripts.adapters import (
     format_antigravity_decision,
     format_claude_decision,
     format_codex_decision,
+    format_cursor_decision,
     format_gemini_decision,
     parse_antigravity_payload,
     parse_claude_payload,
     parse_codex_payload,
+    parse_cursor_payload,
     parse_gemini_payload,
 )
 from scripts.hook_runtime import select_adapter
@@ -30,6 +32,10 @@ class TestHookRuntime(unittest.TestCase):
         parser, formatter = select_adapter("claude")
         self.assertIs(parser, parse_claude_payload)
         self.assertIs(formatter, format_claude_decision)
+
+        parser, formatter = select_adapter("cursor")
+        self.assertIs(parser, parse_cursor_payload)
+        self.assertIs(formatter, format_cursor_decision)
 
 
 if __name__ == "__main__":

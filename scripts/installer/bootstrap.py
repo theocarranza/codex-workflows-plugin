@@ -30,6 +30,7 @@ _MANAGED_HOOK_SCRIPTS = {
     "gemini_enforce_hook.py",
     "antigravity_enforce_hook.py",
     "claude_enforce_hook.py",
+    "cursor_enforce_hook.py",
 }
 
 _RUNTIME_DIRS = ["scripts", "skills", "commands", ".agent", "hooks", ".codex-plugin"]
@@ -290,12 +291,15 @@ def register_codex_plugin(install_dir: Path) -> bool:
     category = manifest.get("interface", {}).get("category", "Productivity")
 
     marketplace_path = Path.home() / ".agents" / "plugins" / "marketplace.json"
-    marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
 
     if marketplace_path.exists():
         try:
             marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             marketplace = {}
     else:
         marketplace = {}
@@ -313,7 +317,10 @@ def register_codex_plugin(install_dir: Path) -> bool:
         "category": category,
     })
 
-    marketplace_path.write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+    try:
+        marketplace_path.write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+    except OSError:
+        return False
     return True
 
 
@@ -362,6 +369,11 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
             del sys.modules[mod_name]
 
     from scripts.installer.cli import install  # noqa: PLC0415
+    from scripts.installer.cursor_hooks import (  # noqa: PLC0415
+        desired_cursor_hooks,
+        merge_cursor_hooks,
+        strip_managed_cursor_hooks,
+    )
     from scripts.installer.merge import merge_hook_configs  # noqa: PLC0415
     from scripts.installer.targets import Target, target_global_config_path  # noqa: PLC0415
 
@@ -371,6 +383,7 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
         "codex": "Codex CLI (codex-cli) & IDE plugin",
         "antigravity": "Antigravity IDE",
         "antigravity-cli": "Antigravity CLI (antigravity-cli)",
+        "cursor": "Cursor IDE",
     }
 
     if target == "all-agents":
@@ -384,6 +397,29 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
 
     for t in targets:
         client_name = client_names.get(t, t)
+        if t == "cursor":
+            hook_command = f"python3 {install_dir / 'skills/codex_workflows/scripts/cursor_enforce_hook.py'}"
+            if project_dest is not None:
+                config_path = Path(project_dest) / ".cursor" / "hooks.json"
+            else:
+                config_path = target_global_config_path(t)
+            if config_path is None:
+                failed_wirings.append((client_name, "Could not locate the Cursor hooks configuration path."))
+                continue
+            try:
+                on_disk = None
+                if config_path.exists():
+                    on_disk = json.loads(config_path.read_text(encoding="utf-8"))
+                if on_disk:
+                    on_disk = strip_managed_cursor_hooks(on_disk, _MANAGED_HOOK_SCRIPTS)
+                final_config = merge_cursor_hooks(on_disk, desired_cursor_hooks(hook_command))
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                config_path.write_text(json.dumps(final_config, indent=2) + "\n", encoding="utf-8")
+                successful_wirings.append((client_name, str(config_path), hook_command))
+            except Exception as e:
+                failed_wirings.append((client_name, str(e)))
+            continue
+
         if project_dest is not None:
             # Local project install
             try:
@@ -402,15 +438,29 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
             if global_path is None:
                 if target != "all-agents":
                     failed_wirings.append((client_name, "Could not locate the global configuration path for this client."))
+                elif t == "antigravity":
+                    skipped_wirings.append(
+                        (
+                            client_name,
+                            "Antigravity IDE install directory not found (optional; plugin assets were still registered under ~/.gemini/antigravity-ide/plugins/)",
+                        )
+                    )
                 else:
-                    skipped_wirings.append((client_name, "Config directory/installation not found on this machine"))
+                    skipped_wirings.append((client_name, "Client installation/directory not found on this machine"))
                 continue
 
             if not global_path.parent.is_dir() and not global_path.exists():
                 if target != "all-agents":
                     failed_wirings.append((client_name, f"Configuration directory '{global_path.parent}' does not exist."))
+                elif t == "antigravity":
+                    skipped_wirings.append(
+                        (
+                            client_name,
+                            "Antigravity IDE install directory not found (optional; plugin assets were still registered under ~/.gemini/antigravity-ide/plugins/)",
+                        )
+                    )
                 else:
-                    skipped_wirings.append((client_name, "Client installation/directory not found"))
+                    skipped_wirings.append((client_name, f"Configuration directory '{global_path.parent}' does not exist."))
                 continue
 
             try:
@@ -539,7 +589,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--target",
-        help="Agent host to wire: claude, codex, gemini, antigravity, all-agents.",
+        help="Agent host to wire: claude, codex, gemini, antigravity, cursor, all-agents.",
     )
     parser.add_argument(
         "--dest",
@@ -583,6 +633,8 @@ def main() -> int:
     if register_codex_plugin(install_dir):
         print(f"Registered plugin in Codex marketplace    → {Path.home() / '.agents' / 'plugins' / 'marketplace.json'}")
         print(f"  ⚠  Run once to activate Codex skills:  codex plugin add codex-workflows-plugin@personal")
+    else:
+        print("Warning: Could not register plugin in Codex marketplace", file=sys.stderr)
 
     # ── wire step ─────────────────────────────────────────────────────────────
     if args.target:

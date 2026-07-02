@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .cursor_hooks import desired_cursor_hooks, merge_cursor_hooks
 from .merge import merge_hook_configs
 from .targets import Target, normalize_target, target_config_paths, target_hook_command
 
@@ -36,6 +37,7 @@ def _hook_command(target: Target, plugin_root: Path) -> str:
         Target.ANTIGRAVITY: "antigravity_enforce_hook.py",
         Target.ANTIGRAVITY_CLI: "antigravity_enforce_hook.py",
         Target.CLAUDE: "claude_enforce_hook.py",
+        Target.CURSOR: "cursor_enforce_hook.py",
     }
     script = plugin_root / "skills" / "codex_workflows" / "scripts" / script_names[target]
     return f"python3 {script}"
@@ -109,14 +111,23 @@ def install(
     normalized_target = normalize_target(target)
     shared_assets = normalized_target in {Target.UNIVERSAL, Target.ALL_AGENTS}
     codex_config = normalized_target in {Target.CODEX, Target.ALL_AGENTS}
-    target_config = normalized_target in {Target.CODEX, Target.GEMINI, Target.ANTIGRAVITY, Target.ANTIGRAVITY_CLI, Target.CLAUDE}
+    target_config = normalized_target in {
+        Target.CODEX,
+        Target.GEMINI,
+        Target.ANTIGRAVITY,
+        Target.ANTIGRAVITY_CLI,
+        Target.CLAUDE,
+        Target.CURSOR,
+    }
     config_paths = target_config_paths(normalized_target)
     merged_config = None
 
     desired_hooks: dict[str, Any] | None = None
     if target_config:
         hook_command = _hook_command(normalized_target, plugin_root)
-        if normalized_target == Target.ANTIGRAVITY:
+        if normalized_target == Target.CURSOR:
+            desired_hooks = desired_cursor_hooks(hook_command)
+        elif normalized_target == Target.ANTIGRAVITY:
             desired_hooks = {
                 "codex-enforcer": {
                     "enabled": True,
@@ -203,7 +214,11 @@ def install(
                     ]
                 }
             }
-        merged_config = merge_hook_configs(existing_hooks, desired_hooks)
+        merged_config = (
+            merge_cursor_hooks(existing_hooks, desired_hooks)
+            if normalized_target == Target.CURSOR
+            else merge_hook_configs(existing_hooks, desired_hooks)
+        )
 
     if dest_root is not None:
         sync_shared_assets(dest_root)
@@ -222,7 +237,7 @@ def install(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Install Codex workflow assets for a specific client target.")
-    parser.add_argument("--target", default="codex", help="Target client: codex, gemini, antigravity, claude, universal, all-agents")
+    parser.add_argument("--target", default="codex", help="Target client: codex, gemini, antigravity, claude, cursor, universal, all-agents")
     parser.add_argument("--profile", default="generic", help="Installer profile name")
     parser.add_argument(
         "--output",

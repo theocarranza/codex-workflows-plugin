@@ -1,6 +1,6 @@
 ---
 name: resolve-ticket
-description: Resolve a ticket and archive the work in AI_Codex.
+description: Resolve a ticket with Actor-Critic resolution report grounded on specs before archival.
 ---
 
-Finalize the work, update the ledger, and archive the ticket when the migration is complete.
+Invoke the resolve-ticket skill via the orchestrator. Produce a resolution report under `<vault>/Specs/<slug>/resolution-report.md` before moving the ticket to Closed/Resolved.

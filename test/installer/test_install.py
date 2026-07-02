@@ -6,7 +6,13 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from scripts.installer.bootstrap import INSTALL_DIR, install_from_source, install_from_zip, register_claude_plugin
+from scripts.installer.bootstrap import (
+    INSTALL_DIR,
+    install_from_source,
+    install_from_zip,
+    register_claude_plugin,
+    register_codex_plugin,
+)
 
 
 PLUGIN_ROOT = Path(__file__).parent.parent.parent
@@ -105,6 +111,32 @@ class TestRegisterClaudePlugin(unittest.TestCase):
 
             registry = json.loads((fake_home_path / ".claude" / "plugins" / "installed_plugins.json").read_text())
             self.assertIn("codex-workflows-plugin@local", registry["plugins"])
+
+
+class TestRegisterCodexPlugin(unittest.TestCase):
+    def test_writes_marketplace_entry(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as install_dir, tempfile.TemporaryDirectory() as fake_home:
+            root = Path(install_dir)
+            manifest = {
+                "name": "codex-workflows-plugin",
+                "version": "9.9.9-test",
+                "interface": {"category": "Productivity"},
+            }
+            (root / ".codex-plugin").mkdir()
+            (root / ".codex-plugin" / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+            fake_home_path = Path(fake_home)
+            with patch.object(Path, "home", return_value=fake_home_path):
+                self.assertTrue(register_codex_plugin(root))
+
+            marketplace_path = fake_home_path / ".agents" / "plugins" / "marketplace.json"
+            marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+            names = [p["name"] for p in marketplace["plugins"]]
+            self.assertIn("codex-workflows-plugin", names)
+            entry = next(p for p in marketplace["plugins"] if p["name"] == "codex-workflows-plugin")
+            self.assertEqual(entry["source"]["path"], str(root))
 
 
 class TestInstallFromZip(unittest.TestCase):
