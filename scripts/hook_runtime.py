@@ -12,10 +12,12 @@ from scripts.adapters import (
     format_antigravity_decision,
     format_claude_decision,
     format_codex_decision,
+    format_cursor_decision,
     format_gemini_decision,
     parse_antigravity_payload,
     parse_claude_payload,
     parse_codex_payload,
+    parse_cursor_payload,
     parse_gemini_payload,
 )
 from scripts.payload_capture import capture_hook_payload
@@ -107,6 +109,8 @@ def select_adapter(client: str) -> tuple[Callable[[dict[str, Any], str, str], Ca
         return parse_antigravity_payload, format_antigravity_decision
     if normalized == "claude":
         return parse_claude_payload, format_claude_decision
+    if normalized == "cursor":
+        return parse_cursor_payload, format_cursor_decision
     return parse_codex_payload, format_codex_decision
 
 
@@ -116,6 +120,9 @@ def emit_decision(client: str, decision: PolicyDecision) -> None:
 
 
 def run(client: str, input_data: dict[str, Any]) -> int:
+    if input_data.get("transcript_path") and not input_data.get("transcriptPath"):
+        input_data = {**input_data, "transcriptPath": input_data["transcript_path"]}
+
     project_root = get_project_root()
     vault_dir = get_vault_dir(project_root)
     capture_dir = os.environ.get("CODEX_WORKFLOW_CAPTURE_DIR")

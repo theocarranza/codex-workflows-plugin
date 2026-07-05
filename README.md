@@ -99,9 +99,9 @@ No additional Python dependencies are needed — the plugin uses only the standa
 Bootstrap does two things automatically:
 
 1. **Installs the runtime** to `~/.codex-workflows/` (the stable location hook commands reference).
-2. **Registers the plugin with Claude Code** by copying the skills tree into `~/.claude/plugins/cache/local/codex-workflows-plugin/<version>/` and adding an entry to `~/.claude/plugins/installed_plugins.json`. After this, the plugin appears in Claude's plugin manager and its skills are available to any Claude session.
+2. **Registers the plugin with Claude Code and Cursor** by copying the skills tree into each host's plugin cache (`~/.claude/plugins/cache/local/...` and `~/.cursor/plugins/cache/local/...`). After this, the plugin skills are available to Claude and Cursor sessions.
 
-> **After bootstrapping, restart your Claude session** (close and reopen the IDE panel or CLI) for the newly registered skills to appear.
+> **After bootstrapping, restart your Claude or Cursor session** (close and reopen the IDE panel or CLI) for the newly registered skills and hooks to load.
 
 ### Step 2 — Wire your agent host(s)
 
@@ -122,11 +122,12 @@ The plugin auto-discovers each host's config location:
 | Target | Global config wired | Hook event |
 |---|---|---|
 | `claude` | `~/.claude/settings.json` | `PreToolUse` |
+| `cursor` | `~/.cursor/hooks.json` | `preToolUse` |
 | `gemini` | `~/.gemini/settings.json` (Deprecated) | `BeforeTool` |
 | `codex` | `~/.gemini/config/hooks.json` | `PreToolUse` |
 | `antigravity` | `<ide-install>/.agents/hooks.json` (auto-discovered) | `PreToolUse` |
 | `antigravity-cli` | `~/.gemini/antigravity-cli/settings.json` | `BeforeTool` |
-| `all-agents` | all five above | — |
+| `all-agents` | all six above | — |
 
 Hook wiring is idempotent — re-running bootstrap strips any stale entries from previous installs before writing the fresh hook, so running it multiple times is safe.
 
@@ -164,7 +165,7 @@ python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agent
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**91 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 4 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying), profiles, and release packager.
+**147 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying), profiles, and release packager.
 
 ---
 

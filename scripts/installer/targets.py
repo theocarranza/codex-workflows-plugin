@@ -10,6 +10,7 @@ class Target(str, Enum):
     ANTIGRAVITY = "antigravity"
     ANTIGRAVITY_CLI = "antigravity-cli"
     CLAUDE = "claude"
+    CURSOR = "cursor"
     UNIVERSAL = "universal"
     ALL_AGENTS = "all-agents"
 
@@ -37,6 +38,8 @@ def target_config_paths(target: str | Target) -> tuple[str, ...]:
         return (".gemini/antigravity-cli/settings.json",)
     if normalized == Target.CLAUDE:
         return (".claude/settings.json",)
+    if normalized == Target.CURSOR:
+        return (".cursor/hooks.json",)
     if normalized in {Target.UNIVERSAL, Target.ALL_AGENTS}:
         return ()
     return ()
@@ -46,6 +49,7 @@ def target_global_config_path(target: str | Target) -> Path | None:
     """Absolute path to the machine-global hook config for this target, if discoverable.
 
     Claude  → ~/.claude/settings.json
+    Cursor  → ~/.cursor/hooks.json
     Gemini  → ~/.gemini/settings.json
     Codex   → ~/.gemini/config/hooks.json  (Codex uses the Gemini CLI config layer)
     Antigravity → <ide-install>/.agents/hooks.json  (IDE directory is auto-discovered)
@@ -54,6 +58,8 @@ def target_global_config_path(target: str | Target) -> Path | None:
     normalized = normalize_target(target)
     if normalized == Target.CLAUDE:
         return home / ".claude" / "settings.json"
+    if normalized == Target.CURSOR:
+        return home / ".cursor" / "hooks.json"
     if normalized == Target.GEMINI:
         return home / ".gemini" / "settings.json"
     if normalized == Target.CODEX:
@@ -92,4 +98,6 @@ def target_hook_command(target: str | Target) -> str | None:
         return "python3 skills/codex_workflows/scripts/antigravity_enforce_hook.py"
     if normalized == Target.CLAUDE:
         return "python3 skills/codex_workflows/scripts/claude_enforce_hook.py"
+    if normalized == Target.CURSOR:
+        return "python3 skills/codex_workflows/scripts/cursor_enforce_hook.py"
     return None

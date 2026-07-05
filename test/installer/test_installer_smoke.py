@@ -90,6 +90,20 @@ class TestInstallerSmoke(unittest.TestCase):
                 _expected_cmd("claude_enforce_hook.py"),
             )
 
+    def test_cursor_target_writes_hooks_file(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_path = Path(tempdir) / "hooks.json"
+            result = self._run_installer("cursor", output_path)
+
+            self.assertTrue(output_path.exists())
+            self.assertEqual(result["configPaths"], [".cursor/hooks.json"])
+            content = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(content["version"], 1)
+            self.assertEqual(
+                content["hooks"]["preToolUse"][0]["command"],
+                _expected_cmd("cursor_enforce_hook.py"),
+            )
+
     def test_install_with_dest_syncs_workflows_to_agent_dir(self):
         """When --dest is provided, .agent/workflows/ files are synced to the target."""
         with tempfile.TemporaryDirectory() as tempdir:

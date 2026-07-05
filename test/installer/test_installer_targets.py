@@ -81,6 +81,52 @@ class TestInstallerTargets(unittest.TestCase):
             _expected_cmd("claude_enforce_hook.py"),
         )
 
+    def test_cursor_target_installs_hooks_json(self):
+        result = install(target="cursor")
+
+        self.assertFalse(result.written_codex_config)
+        self.assertTrue(result.written_shared_assets)
+        self.assertTrue(result.written_target_config)
+        self.assertEqual(result.config_paths, (".cursor/hooks.json",))
+        self.assertEqual(result.merged_config["version"], 1)
+        self.assertEqual(
+            result.merged_config["hooks"]["preToolUse"][0]["command"],
+            _expected_cmd("cursor_enforce_hook.py"),
+        )
+        self.assertIn("Shell|Read|Write", result.merged_config["hooks"]["preToolUse"][0]["matcher"])
+
+    def test_merge_hook_configs_deduplicates_cursor_flat_hooks(self):
+        existing = {
+            "version": 1,
+            "hooks": {
+                "preToolUse": [
+                    {
+                        "command": "python3 /tmp/cursor_enforce_hook.py",
+                        "matcher": "Shell",
+                    }
+                ]
+            },
+        }
+        incoming = {
+            "version": 1,
+            "hooks": {
+                "preToolUse": [
+                    {
+                        "command": "python3 /tmp/cursor_enforce_hook.py",
+                        "matcher": "Shell|Read|Write",
+                    }
+                ]
+            },
+        }
+
+        merged = merge_hook_configs(existing, incoming)
+
+        self.assertEqual(len(merged["hooks"]["preToolUse"]), 1)
+        self.assertEqual(
+            merged["hooks"]["preToolUse"][0]["matcher"],
+            "Shell",
+        )
+
     def test_merge_hook_configs_preserves_existing_hooks(self):
         existing = {
             "hooks": {

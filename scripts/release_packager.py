@@ -43,6 +43,8 @@ def build_release_package(*, repo_root: Path, output_dir: Path) -> Path:
 def _iter_release_files(repo_root: Path) -> Iterable[Path]:
     allow_dirs = [
         repo_root / ".codex-plugin",
+        repo_root / ".cursor-plugin",
+        repo_root / "commands",
         repo_root / "hooks",
         repo_root / "skills",
         repo_root / "scripts",

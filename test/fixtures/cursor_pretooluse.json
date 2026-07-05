@@ -1,0 +1,9 @@
+{
+  "hook_event_name": "preToolUse",
+  "tool_name": "Shell",
+  "tool_input": {
+    "command": "mv /workspace/project/AI_Codex/Tickets/Active/task-123.md /workspace/project/AI_Codex/Tickets/Closed/task-123.md",
+    "working_directory": "/workspace/project"
+  },
+  "transcript_path": "/home/agentrick/.cursor/projects/example/agent-transcripts/session.jsonl"
+}

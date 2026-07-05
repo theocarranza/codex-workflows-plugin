@@ -30,9 +30,10 @@ _MANAGED_HOOK_SCRIPTS = {
     "gemini_enforce_hook.py",
     "antigravity_enforce_hook.py",
     "claude_enforce_hook.py",
+    "cursor_enforce_hook.py",
 }
 
-_RUNTIME_DIRS = ["scripts", "skills", ".agent", "hooks", ".codex-plugin"]
+_RUNTIME_DIRS = ["scripts", "skills", "commands", ".agent", "hooks", ".codex-plugin"]
 
 
 def install_from_zip(zip_path: Path, dest: Path) -> None:
@@ -73,15 +74,18 @@ def strip_managed_hooks(config: dict, script_names: set[str]) -> dict:
         elif isinstance(value, list):
             cleaned = []
             for entry in value:
-                if not isinstance(entry, dict) or "hooks" not in entry:
+                if isinstance(entry, dict) and "hooks" in entry:
+                    fresh_hooks = [
+                        h for h in entry["hooks"]
+                        if not any(s in h.get("command", "") for s in script_names)
+                    ]
+                    if fresh_hooks:
+                        cleaned.append({**entry, "hooks": fresh_hooks})
+                elif isinstance(entry, dict) and "command" in entry:
+                    if not any(s in entry.get("command", "") for s in script_names):
+                        cleaned.append(entry)
+                else:
                     cleaned.append(entry)
-                    continue
-                fresh_hooks = [
-                    h for h in entry["hooks"]
-                    if not any(s in h.get("command", "") for s in script_names)
-                ]
-                if fresh_hooks:
-                    cleaned.append({**entry, "hooks": fresh_hooks})
             result[key] = cleaned
         else:
             result[key] = value
@@ -142,6 +146,46 @@ def register_claude_plugin(install_dir: Path) -> bool:
     }]
 
     registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    return True
+
+
+def register_cursor_plugin(install_dir: Path) -> bool:
+    """Install the plugin into ~/.cursor/plugins/cache/ for Cursor IDE and CLI discovery.
+
+    Copies the plugin's ``skills/`` tree into the Cursor plugin cache and writes a
+    ``.cursor-plugin/plugin.json`` manifest. Returns True on success.
+    """
+    manifest_path = install_dir / ".codex-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        manifest_path = install_dir / "plugin.json"
+    if not manifest_path.exists():
+        return False
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    name = manifest.get("name", "codex-workflows-plugin")
+    version = manifest.get("version", "unknown")
+    interface = manifest.get("interface", {})
+
+    cache_dir = Path.home() / ".cursor" / "plugins" / "cache" / "local" / name / version
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+    cache_dir.mkdir(parents=True)
+
+    src_skills = install_dir / "skills"
+    if src_skills.is_dir():
+        shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+
+    cursor_manifest = {
+        "name": name,
+        "displayName": interface.get("displayName", name),
+        "version": version,
+        "description": manifest.get("description", ""),
+        "author": manifest.get("author", {}),
+        "skills": "./skills/",
+    }
+    plugin_dir = cache_dir / ".cursor-plugin"
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+    (plugin_dir / "plugin.json").write_text(json.dumps(cursor_manifest, indent=2), encoding="utf-8")
     return True
 
 
@@ -288,6 +332,7 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
 
     client_names = {
         "claude": "Claude CLI (claude-cli) & IDE plugin",
+        "cursor": "Cursor IDE & CLI",
         "gemini": "Gemini CLI (gemini) [Deprecated]",
         "codex": "Codex CLI (codex-cli) & IDE plugin",
         "antigravity": "Antigravity IDE",
@@ -413,11 +458,24 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
 
 def _extract_command(config: dict) -> str | None:
     """Pull the first hook command out of any supported config shape."""
+    hooks_block = config.get("hooks", {})
+    if isinstance(hooks_block, dict):
+        for event_hooks in hooks_block.values():
+            if isinstance(event_hooks, list):
+                for entry in event_hooks:
+                    if isinstance(entry, dict) and "command" in entry:
+                        return entry["command"]
+                    for hook in entry.get("hooks", []):
+                        if "command" in hook:
+                            return hook["command"]
+
     for section in ("hooks", "codex-enforcer"):
         block = config.get(section, {})
         for event_hooks in block.values():
             if isinstance(event_hooks, list):
                 for entry in event_hooks:
+                    if isinstance(entry, dict) and "command" in entry:
+                        return entry["command"]
                     for hook in entry.get("hooks", []):
                         if "command" in hook:
                             return hook["command"]
@@ -450,7 +508,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--target",
-        help="Agent host to wire: claude, codex, gemini, antigravity, all-agents.",
+        help="Agent host to wire: claude, cursor, codex, gemini, antigravity, all-agents.",
     )
     parser.add_argument(
         "--dest",
@@ -485,6 +543,8 @@ def main() -> int:
     # ── plugin registration step ──────────────────────────────────────────────
     if register_claude_plugin(install_dir):
         print(f"Registered plugin with Claude Code        → {Path.home() / '.claude' / 'plugins' / 'cache' / 'local'}")
+    if register_cursor_plugin(install_dir):
+        print(f"Registered plugin with Cursor             → {Path.home() / '.cursor' / 'plugins' / 'cache' / 'local'}")
     if register_antigravity_plugin(install_dir):
         print(f"Registered plugin with Antigravity IDE    → {Path.home() / '.gemini' / 'antigravity-ide' / 'plugins'}")
     if register_antigravity_config_plugin(install_dir):

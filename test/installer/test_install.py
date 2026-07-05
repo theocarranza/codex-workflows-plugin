@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -24,6 +25,7 @@ class TestInstallFromSource(unittest.TestCase):
 
         self.assertTrue((self.dest / "scripts").is_dir())
         self.assertTrue((self.dest / "skills").is_dir())
+        self.assertTrue((self.dest / "commands").is_dir())
         self.assertTrue((self.dest / ".codex-plugin").is_dir())
 
     def test_copies_hook_entrypoints(self):
@@ -31,6 +33,8 @@ class TestInstallFromSource(unittest.TestCase):
 
         hook = self.dest / "skills" / "codex_workflows" / "scripts" / "antigravity_enforce_hook.py"
         self.assertTrue(hook.exists())
+        cursor_hook = self.dest / "skills" / "codex_workflows" / "scripts" / "cursor_enforce_hook.py"
+        self.assertTrue(cursor_hook.exists())
 
     def test_copies_policy_engine(self):
         install_from_source(PLUGIN_ROOT, self.dest)
@@ -108,11 +112,13 @@ class TestInstallFromZip(unittest.TestCase):
 class TestInstallCLI(unittest.TestCase):
     def _run(self, *args) -> tuple[int, str]:
         import subprocess
-        result = subprocess.run(
-            [sys.executable, "-m", "scripts.installer.bootstrap", *args],
-            capture_output=True,
-            text=True,
-        )
+        with tempfile.TemporaryDirectory() as home:
+            result = subprocess.run(
+                [sys.executable, "-m", "scripts.installer.bootstrap", *args],
+                capture_output=True,
+                text=True,
+                env={**os.environ, "HOME": home},
+            )
         return result.returncode, result.stdout + result.stderr
 
     def test_missing_zip_returns_error(self):

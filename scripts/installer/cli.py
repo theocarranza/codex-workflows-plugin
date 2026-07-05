@@ -36,6 +36,7 @@ def _hook_command(target: Target, plugin_root: Path) -> str:
         Target.ANTIGRAVITY: "antigravity_enforce_hook.py",
         Target.ANTIGRAVITY_CLI: "antigravity_enforce_hook.py",
         Target.CLAUDE: "claude_enforce_hook.py",
+        Target.CURSOR: "cursor_enforce_hook.py",
     }
     script = plugin_root / "skills" / "codex_workflows" / "scripts" / script_names[target]
     return f"python3 {script}"
@@ -97,7 +98,14 @@ def install(
     normalized_target = normalize_target(target)
     shared_assets = normalized_target in {Target.UNIVERSAL, Target.ALL_AGENTS}
     codex_config = normalized_target in {Target.CODEX, Target.ALL_AGENTS}
-    target_config = normalized_target in {Target.CODEX, Target.GEMINI, Target.ANTIGRAVITY, Target.ANTIGRAVITY_CLI, Target.CLAUDE}
+    target_config = normalized_target in {
+        Target.CODEX,
+        Target.GEMINI,
+        Target.ANTIGRAVITY,
+        Target.ANTIGRAVITY_CLI,
+        Target.CLAUDE,
+        Target.CURSOR,
+    }
     config_paths = target_config_paths(normalized_target)
     merged_config = None
 
@@ -173,6 +181,20 @@ def install(
                     ]
                 }
             }
+        elif normalized_target == Target.CURSOR:
+            desired_hooks = {
+                "version": 1,
+                "hooks": {
+                    "preToolUse": [
+                        {
+                            "command": hook_command,
+                            "matcher": "Shell|Read|Write|Grep|Delete|Task",
+                            "timeout": 5,
+                            "failClosed": True,
+                        }
+                    ]
+                },
+            }
         else:
             desired_hooks = {
                 "hooks": {
@@ -210,7 +232,7 @@ def install(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Install Codex workflow assets for a specific client target.")
-    parser.add_argument("--target", default="codex", help="Target client: codex, gemini, antigravity, claude, universal, all-agents")
+    parser.add_argument("--target", default="codex", help="Target client: codex, gemini, antigravity, claude, cursor, universal, all-agents")
     parser.add_argument("--profile", default="generic", help="Installer profile name")
     parser.add_argument(
         "--output",
