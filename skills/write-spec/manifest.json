@@ -1,0 +1,39 @@
+{
+  "name": "write-spec",
+  "version": "1.0.0",
+  "description": "Generate adversarially reviewed specification files for a ticket using Actor-Critic reflection.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "string",
+        "description": "Ticket identifier (e.g., YouTrack issue id)."
+      },
+      "spec_kind": {
+        "type": "string",
+        "description": "Template kind: rfc, adr, design-doc, tech-spec, srs, implementation-plan, bugfix-spec, api-contract."
+      },
+      "draft_content": {
+        "type": "string",
+        "description": "Optional draft markdown for Critic evaluation (Actor-Critic loop)."
+      },
+      "attempt": {
+        "type": "number",
+        "description": "Reflection attempt counter (managed by orchestrator retries)."
+      }
+    },
+    "required": ["ticket_id", "spec_kind"]
+  },
+  "output_signature": {
+    "type": "object",
+    "required": ["ticket_id", "spec_kind", "specs_dir", "mode"],
+    "properties": {
+      "ticket_id": { "type": "string" },
+      "spec_kind": { "type": "string" },
+      "specs_dir": { "type": "string" },
+      "mode": { "type": "string" },
+      "critiques": { "type": "string" }
+    }
+  },
+  "tools": []
+}
