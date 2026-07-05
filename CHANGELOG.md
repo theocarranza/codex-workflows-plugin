@@ -13,6 +13,24 @@ _(nothing yet)_
 
 ---
 
+## [0.2.9] — 2026-07-05
+
+### Added
+- **Full uninstall cleanup** (`scripts/installer/uninstall.py`, `scripts/installer/bootstrap.py`): `python3 -m scripts.installer.bootstrap --uninstall` now removes managed host hook entries, Claude/Cursor/Antigravity plugin caches, the Claude local plugin registry entry, the Codex personal marketplace entry, and the installed `~/.codex-workflows/` runtime by default.
+- `--dest`, `--keep-runtime`, and `--dry-run` support for uninstall cleanup. `--dest` also removes generated project-level hook configs and known `.agent/workflows` / `.agent/rules` assets while preserving unrelated project files.
+- Temp-`HOME` uninstall integration coverage for full cleanup, project cleanup, runtime retention, and dry-run behavior.
+
+### Changed
+- README installation docs now include the primary uninstall command and clarify optional project cleanup/runtime-retention flags.
+- Release metadata bumped to `0.2.9`.
+
+### Fixed
+- **Claude hook response schema** (`scripts/adapters/claude_adapter.py`): Claude decisions now emit `hookSpecificOutput.permissionDecision` / `permissionDecisionReason` for `PreToolUse` instead of the legacy top-level `decision` / `reason` shape.
+- Claude payload parsing now recognizes `tool_input.file_path` for file-oriented tools.
+- Claude plugin registration now copies runtime `scripts/` dependencies into the Claude plugin cache so cached plugin hooks can import their runtime modules.
+
+---
+
 ## [0.2.8] — 2026-06-23
 
 ### Added

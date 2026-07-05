@@ -99,9 +99,9 @@ No additional Python dependencies are needed — the plugin uses only the standa
 Bootstrap does two things automatically:
 
 1. **Installs the runtime** to `~/.codex-workflows/` (the stable location hook commands reference).
-2. **Registers the plugin with Claude Code and Cursor** by copying the skills tree into each host's plugin cache (`~/.claude/plugins/cache/local/...` and `~/.cursor/plugins/cache/local/...`). After this, the plugin skills are available to Claude and Cursor sessions.
+2. **Registers the plugin with supported local hosts** by refreshing Claude Code, Cursor, Antigravity, and Codex local plugin/cache or marketplace entries when those host directories are present. After this, plugin skills are discoverable after restarting the host session.
 
-> **After bootstrapping, restart your Claude or Cursor session** (close and reopen the IDE panel or CLI) for the newly registered skills and hooks to load.
+> **After bootstrapping, restart your active CLI or IDE session** for the newly registered skills and hooks to load.
 
 ### Step 2 — Wire your agent host(s)
 
@@ -157,6 +157,16 @@ Re-run bootstrap with the new zip — it replaces `~/.codex-workflows/`, refresh
 python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agents
 ```
 
+### Uninstalling the plugin
+
+Run the cleanup path to remove managed host hooks, plugin caches, marketplace entries, and the installed runtime:
+
+```bash
+python3 -m scripts.installer.bootstrap --uninstall
+```
+
+Pass `--dest /path/to/project` to also remove generated project hook configs and `.agent` assets. Pass `--keep-runtime` only when you want to unwire hosts but keep `~/.codex-workflows/` for debugging.
+
 ---
 
 ## Tests
@@ -165,7 +175,7 @@ python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agent
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**147 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying), profiles, and release packager.
+**157 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying and uninstall cleanup), profiles, and release packager.
 
 ---
 

@@ -7,7 +7,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from scripts.installer.bootstrap import INSTALL_DIR, install_from_source, install_from_zip
+from scripts.installer.bootstrap import INSTALL_DIR, install_from_source, install_from_zip, register_claude_plugin
 
 
 PLUGIN_ROOT = Path(__file__).parent.parent.parent
@@ -133,6 +133,42 @@ class TestInstallCLI(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertIn("Installed to", output)
             self.assertTrue((Path(dest) / "scripts").is_dir())
+
+
+class TestClaudePluginRegistration(unittest.TestCase):
+    def test_claude_plugin_cache_includes_hook_runtime_dependencies(self):
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as install_dir:
+            install_root = Path(install_dir)
+            shutil.copytree(PLUGIN_ROOT / "skills", install_root / "skills")
+            shutil.copytree(PLUGIN_ROOT / "scripts", install_root / "scripts")
+            plugin_dir = install_root / ".codex-plugin"
+            plugin_dir.mkdir()
+            (plugin_dir / "plugin.json").write_text(
+                json.dumps(
+                    {
+                        "name": "codex-workflows-plugin",
+                        "version": "0.0.0-test",
+                        "description": "test",
+                        "author": {"name": "test"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            old_home = os.environ.get("HOME")
+            os.environ["HOME"] = home
+            try:
+                self.assertTrue(register_claude_plugin(install_root))
+            finally:
+                if old_home is None:
+                    os.environ.pop("HOME", None)
+                else:
+                    os.environ["HOME"] = old_home
+
+            cache_dir = Path(home) / ".claude" / "plugins" / "cache" / "local" / "codex-workflows-plugin" / "0.0.0-test"
+            self.assertTrue((cache_dir / "skills" / "codex_workflows" / "scripts" / "claude_enforce_hook.py").exists())
+            self.assertTrue((cache_dir / "scripts" / "hook_runtime.py").exists())
+            self.assertTrue((cache_dir / "scripts" / "adapters" / "claude_adapter.py").exists())
 
 
 if __name__ == "__main__":
