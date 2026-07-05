@@ -129,20 +129,18 @@ The plugin installs a `PreToolUse` / `BeforeTool` hook that intercepts every age
 - Git (required for git safety checks at ticket-start time)
 - The **target project** must be a git repository
 
-### Step 1 — Bootstrap the plugin (one-time, per machine)
+### One-step install
 
-Download the [latest release zip](https://github.com/theocarranza/codex-workflows-plugin/releases/latest) and run the bootstrap script:
+Install the latest release and wire all detected agent hosts:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-<version>.zip
+curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash
 ```
 
-Or, if you prefer to work from a clone:
+To also wire a specific project with project-level hooks, pass `--dest`:
 
 ```bash
-git clone https://github.com/theocarranza/codex-workflows-plugin.git
-cd codex-workflows-plugin
-python3 -m scripts.installer.bootstrap
+curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash -s -- --dest /path/to/your/project
 ```
 
 No additional Python dependencies are needed — the plugin uses only the standard library.
@@ -155,18 +153,18 @@ Bootstrap does three things automatically:
 
 > **After bootstrapping, restart your Claude session** (close and reopen the IDE panel or CLI) for the newly registered skills and commands to appear.
 
-### Step 2 — Wire your agent host(s)
+### Advanced install options
 
-Run bootstrap with `--target` to wire all hosts in one command. The installer knows each host's global config location — no `--dest` needed:
+Pin a specific release:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-<version>.zip --target all-agents
+curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | CODEX_WORKFLOWS_VERSION=v0.5.2 bash
 ```
 
-Or from source:
+Wire a specific host instead of all agents:
 
 ```bash
-python3 -m scripts.installer.bootstrap --target all-agents
+curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash -s -- --target claude
 ```
 
 The plugin auto-discovers each host's config location:
@@ -183,15 +181,15 @@ The plugin auto-discovers each host's config location:
 
 Hook wiring is idempotent — re-running bootstrap strips any stale entries from previous installs before writing the fresh hook, so running it multiple times is safe.
 
-### Step 2b — Wire a specific project (optional)
-
-To add project-level hooks alongside the global ones, pass `--dest`:
+If you prefer to work from a clone:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-<version>.zip --target all-agents --dest /path/to/your/project
+git clone https://github.com/theocarranza/codex-workflows-plugin.git
+cd codex-workflows-plugin
+python3 -m scripts.installer.bootstrap --target all-agents
 ```
 
-This also syncs `.agent/workflows/*.md` and `.agent/rules/*.md` into the project, and merges an `agentic-orchestrator` MCP server entry into the project's `.mcp.json`.
+Passing `--dest` also syncs `.agent/workflows/*.md` and `.agent/rules/*.md` into the project, and merges an `agentic-orchestrator` MCP server entry into the project's `.mcp.json`.
 
 ### Dry-run
 
@@ -203,10 +201,10 @@ python3 ~/.codex-workflows/scripts/installer/cli.py --target claude --output /tm
 
 ### Updating the plugin
 
-Re-run bootstrap with the new zip — it replaces `~/.codex-workflows/`, refreshes the Claude plugin cache, and re-wires all hooks in one step:
+Re-run the one-step installer. It replaces `~/.codex-workflows/`, refreshes the Claude plugin cache, and re-wires all hooks in one step:
 
 ```bash
-python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agents
+curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash
 ```
 
 ### Uninstalling the plugin
@@ -214,7 +212,7 @@ python3 bootstrap.py codex-workflows-plugin-<new-version>.zip --target all-agent
 Run the cleanup path to remove managed host hooks, plugin caches, marketplace entries, and the installed runtime:
 
 ```bash
-python3 -m scripts.installer.bootstrap --uninstall
+curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash -s -- --uninstall
 ```
 
 Pass `--dest /path/to/project` to also remove generated project hook configs and `.agent` assets. Pass `--keep-runtime` only when you want to unwire hosts but keep `~/.codex-workflows/` for debugging.
@@ -227,7 +225,7 @@ Pass `--dest /path/to/project` to also remove generated project hook configs and
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**157 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime, spec/resolution reflection, installer (dry-run, live `--dest` write, and uninstall cleanup), orchestrator (state machine, MCP server, evaluator, hooks), profiles, and release packager.
+**160 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime, spec/resolution reflection, installer (one-step shell install, dry-run, live `--dest` write, and uninstall cleanup), orchestrator (state machine, MCP server, evaluator, hooks), profiles, and release packager.
 
 CI also runs `python3 scripts/validate_plugin.py .` to verify the plugin manifest and skills layout.
 
@@ -239,6 +237,6 @@ CI also runs `python3 scripts/validate_plugin.py .` to verify the plugin manifes
 python3 -m scripts.release_packager --output-dir dist/
 ```
 
-Emits `dist/codex-workflows-plugin-<version>.zip`. Version is read from `.codex-plugin/plugin.json`. The archive includes plugin metadata, hooks, skills, commands, scripts, and docs — `__pycache__` and test directories are excluded.
+Emits `dist/codex-workflows-plugin-<version>.zip`. Version is read from `.codex-plugin/plugin.json`. The archive includes plugin metadata, hooks, skills, commands, scripts, `install.sh`, and docs — `__pycache__` and test directories are excluded.
 
 See [CHANGELOG.md](./CHANGELOG.md) for full version history.

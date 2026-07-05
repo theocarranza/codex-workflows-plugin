@@ -13,6 +13,20 @@ _(nothing yet)_
 
 ---
 
+## [0.5.2] — 2026-07-05
+
+### Added
+- **One-step installer** (`install.sh`): supports `curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash`, downloads the latest GitHub release zip, extracts the bundled bootstrap script, and wires `--target all-agents` by default.
+- `CODEX_WORKFLOWS_VERSION` support for pinning a release tag and `CODEX_WORKFLOWS_RELEASE_ZIP` support for local/offline test installs.
+- Installer script tests covering default all-agents wiring, explicit target preservation, and uninstall argument passthrough.
+
+### Changed
+- README installation docs now lead with the one-step `curl | bash` flow instead of the broken `python3 bootstrap.py <zip>` example.
+- Release packages now include `install.sh`.
+- Plugin metadata bumped to `0.5.2` across Codex and Claude plugin manifests.
+
+---
+
 ## [0.5.1] — 2026-07-05
 
 ### Added
