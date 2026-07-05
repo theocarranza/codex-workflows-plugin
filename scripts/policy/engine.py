@@ -38,7 +38,7 @@ def is_starting_ticket(event: CanonicalToolEvent) -> bool:
         if "Tickets/Ready/" in event.source_path and "Tickets/Active/" in event.destination_path:
             return True
     if event.file_path and "Tickets/Active/" in event.file_path:
-        if event.tool_name in ["write_to_file", "replace_file_content", "multi_replace_file_content"]:
+        if event.tool_name in ["write_to_file", "replace_file_content", "multi_replace_file_content", "Write", "StrReplace", "Edit"]:
             if not os.path.exists(event.file_path):
                 return True
     return False
@@ -139,7 +139,14 @@ def _is_markdown_denied(event: CanonicalToolEvent) -> bool:
 
 
 def _requires_session(event: CanonicalToolEvent) -> bool:
-    return event.tool_name in {"write_to_file", "replace_file_content", "multi_replace_file_content"}
+    return event.tool_name in {
+        "write_to_file",
+        "replace_file_content",
+        "multi_replace_file_content",
+        "Write",
+        "StrReplace",
+        "Edit",
+    }
 
 
 def _evaluate_ticket_paths(event: CanonicalToolEvent) -> PolicyDecision:

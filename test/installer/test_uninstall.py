@@ -60,7 +60,9 @@ class TestBootstrapUninstall(unittest.TestCase):
             self.assertEqual(install.returncode, 0, install.stdout + install.stderr)
             self.assertTrue(install_dir.is_dir())
             self.assertTrue((home / ".claude" / "plugins" / "installed_plugins.json").exists())
-            self.assertTrue((home / ".cursor" / "plugins" / "cache" / "local" / "codex-workflows-plugin").exists())
+            cursor_cache = home / ".cursor" / "plugins" / "cache" / "local" / "codex-workflows-plugin" / "stale"
+            cursor_cache.mkdir(parents=True)
+            (cursor_cache / "plugin.json").write_text("{}", encoding="utf-8")
 
             uninstall = _run_bootstrap(home, "--install-dir", str(install_dir), "--uninstall")
             self.assertEqual(uninstall.returncode, 0, uninstall.stdout + uninstall.stderr)

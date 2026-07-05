@@ -77,18 +77,15 @@ def strip_managed_hooks(config: dict, script_names: set[str]) -> dict:
         elif isinstance(value, list):
             cleaned = []
             for entry in value:
-                if isinstance(entry, dict) and "hooks" in entry:
-                    fresh_hooks = [
-                        h for h in entry["hooks"]
-                        if not any(s in h.get("command", "") for s in script_names)
-                    ]
-                    if fresh_hooks:
-                        cleaned.append({**entry, "hooks": fresh_hooks})
-                elif isinstance(entry, dict) and "command" in entry:
-                    if not any(s in entry.get("command", "") for s in script_names):
-                        cleaned.append(entry)
-                else:
+                if not isinstance(entry, dict) or "hooks" not in entry:
                     cleaned.append(entry)
+                    continue
+                fresh_hooks = [
+                    h for h in entry["hooks"]
+                    if not any(s in h.get("command", "") for s in script_names)
+                ]
+                if fresh_hooks:
+                    cleaned.append({**entry, "hooks": fresh_hooks})
             result[key] = cleaned
         else:
             result[key] = value
@@ -115,20 +112,44 @@ def register_claude_plugin(install_dir: Path) -> bool:
     # Copy into the Claude plugin cache under a "local" marketplace bucket.
     cache_dir = Path.home() / ".claude" / "plugins" / "cache" / "local" / name / version
     if cache_dir.exists():
-        shutil.rmtree(cache_dir)
-    cache_dir.mkdir(parents=True)
+        try:
+            shutil.rmtree(cache_dir)
+        except OSError:
+            return False
+    try:
+        cache_dir.mkdir(parents=True)
+    except OSError:
+        return False
 
     # Copy skills directory.
     src_skills = install_dir / "skills"
     if src_skills.is_dir():
-        shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        try:
+            shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
+
+    # Copy commands directory (user-invocable slash commands).
+    src_commands = install_dir / "commands"
+    if src_commands.is_dir():
+        try:
+            shutil.copytree(src_commands, cache_dir / "commands", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
+
     src_scripts = install_dir / "scripts"
     if src_scripts.is_dir():
-        shutil.copytree(src_scripts, cache_dir / "scripts", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        try:
+            shutil.copytree(src_scripts, cache_dir / "scripts", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
 
     # Write a minimal plugin.json (no extra fields) matching the format Claude expects.
     clean_manifest = {k: manifest[k] for k in ("name", "description", "version", "author") if k in manifest}
-    (cache_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+    try:
+        (cache_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+    except OSError:
+        return False
 
     registry_path = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
     registry: dict = {"version": 2, "plugins": {}}
@@ -151,47 +172,11 @@ def register_claude_plugin(install_dir: Path) -> bool:
         "lastUpdated": now,
     }]
 
-    registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
-    return True
-
-
-def register_cursor_plugin(install_dir: Path) -> bool:
-    """Install the plugin into ~/.cursor/plugins/cache/ for Cursor IDE and CLI discovery.
-
-    Copies the plugin's ``skills/`` tree into the Cursor plugin cache and writes a
-    ``.cursor-plugin/plugin.json`` manifest. Returns True on success.
-    """
-    manifest_path = install_dir / ".codex-plugin" / "plugin.json"
-    if not manifest_path.exists():
-        manifest_path = install_dir / "plugin.json"
-    if not manifest_path.exists():
+    try:
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    except OSError:
         return False
-
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    name = manifest.get("name", "codex-workflows-plugin")
-    version = manifest.get("version", "unknown")
-    interface = manifest.get("interface", {})
-
-    cache_dir = Path.home() / ".cursor" / "plugins" / "cache" / "local" / name / version
-    if cache_dir.exists():
-        shutil.rmtree(cache_dir)
-    cache_dir.mkdir(parents=True)
-
-    src_skills = install_dir / "skills"
-    if src_skills.is_dir():
-        shutil.copytree(src_skills, cache_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-
-    cursor_manifest = {
-        "name": name,
-        "displayName": interface.get("displayName", name),
-        "version": version,
-        "description": manifest.get("description", ""),
-        "author": manifest.get("author", {}),
-        "skills": "./skills/",
-    }
-    plugin_dir = cache_dir / ".cursor-plugin"
-    plugin_dir.mkdir(parents=True, exist_ok=True)
-    (plugin_dir / "plugin.json").write_text(json.dumps(cursor_manifest, indent=2), encoding="utf-8")
     return True
 
 
@@ -221,15 +206,27 @@ def register_antigravity_plugin(install_dir: Path) -> bool:
     # Naming convention mirrors existing IDE plugins: Author.pluginName.pluginName
     plugin_dir = ide_plugins_dir / f"{author}.{name}.{name}"
     if plugin_dir.exists():
-        shutil.rmtree(plugin_dir)
-    plugin_dir.mkdir(parents=True)
+        try:
+            shutil.rmtree(plugin_dir)
+        except OSError:
+            return False
+    try:
+        plugin_dir.mkdir(parents=True)
+    except OSError:
+        return False
 
     src_skills = install_dir / "skills"
     if src_skills.is_dir():
-        shutil.copytree(src_skills, plugin_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        try:
+            shutil.copytree(src_skills, plugin_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
 
     ide_manifest = {"name": name, "description": description, "disabled": False}
-    (plugin_dir / "plugin.json").write_text(json.dumps(ide_manifest), encoding="utf-8")
+    try:
+        (plugin_dir / "plugin.json").write_text(json.dumps(ide_manifest), encoding="utf-8")
+    except OSError:
+        return False
     return True
 
 
@@ -256,19 +253,34 @@ def register_antigravity_config_plugin(install_dir: Path) -> bool:
 
     plugin_dir = config_plugins_dir / name
     if plugin_dir.is_symlink():
-        plugin_dir.unlink()
+        try:
+            plugin_dir.unlink()
+        except OSError:
+            return False
     elif plugin_dir.exists():
-        shutil.rmtree(plugin_dir)
-    plugin_dir.mkdir(parents=True)
+        try:
+            shutil.rmtree(plugin_dir)
+        except OSError:
+            return False
+    try:
+        plugin_dir.mkdir(parents=True)
+    except OSError:
+        return False
 
     src_skills = install_dir / "skills"
     if src_skills.is_dir():
-        shutil.copytree(src_skills, plugin_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        try:
+            shutil.copytree(src_skills, plugin_dir / "skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
 
     # Full plugin.json matching the android-cli-plugin schema (name, version, description, author).
     clean_manifest = {k: manifest[k] for k in ("name", "version", "description", "author") if k in manifest}
-    (plugin_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
-    (plugin_dir / "installed_version.json").write_text(json.dumps({"version": version}), encoding="utf-8")
+    try:
+        (plugin_dir / "plugin.json").write_text(json.dumps(clean_manifest, indent=2), encoding="utf-8")
+        (plugin_dir / "installed_version.json").write_text(json.dumps({"version": version}), encoding="utf-8")
+    except OSError:
+        return False
     return True
 
 
@@ -289,12 +301,15 @@ def register_codex_plugin(install_dir: Path) -> bool:
     category = manifest.get("interface", {}).get("category", "Productivity")
 
     marketplace_path = Path.home() / ".agents" / "plugins" / "marketplace.json"
-    marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
 
     if marketplace_path.exists():
         try:
             marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        except (OSError, json.JSONDecodeError):
             marketplace = {}
     else:
         marketplace = {}
@@ -312,7 +327,38 @@ def register_codex_plugin(install_dir: Path) -> bool:
         "category": category,
     })
 
-    marketplace_path.write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+    try:
+        marketplace_path.write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
+def wire_orchestrator_mcp(install_dir: Path, project_dest: Path) -> bool:
+    """Merge the agentic-orchestrator MCP server into a project's .mcp.json."""
+    mcp_path = project_dest / ".mcp.json"
+    existing: dict = {"mcpServers": {}}
+    if mcp_path.exists():
+        try:
+            existing = json.loads(mcp_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            existing = {"mcpServers": {}}
+
+    servers = existing.setdefault("mcpServers", {})
+    skills_dir = (install_dir / "skills").resolve()
+    servers["agentic-orchestrator"] = {
+        "command": "python3",
+        "args": ["-m", "scripts.orchestrator.mcp_server"],
+        "env": {
+            "PYTHONPATH": str(install_dir.resolve()),
+            "ORCHESTRATOR_SKILLS_DIR": str(skills_dir),
+        },
+    }
+
+    try:
+        mcp_path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        return False
     return True
 
 
@@ -333,16 +379,21 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
             del sys.modules[mod_name]
 
     from scripts.installer.cli import install  # noqa: PLC0415
+    from scripts.installer.cursor_hooks import (  # noqa: PLC0415
+        desired_cursor_hooks,
+        merge_cursor_hooks,
+        strip_managed_cursor_hooks,
+    )
     from scripts.installer.merge import merge_hook_configs  # noqa: PLC0415
     from scripts.installer.targets import Target, target_global_config_path  # noqa: PLC0415
 
     client_names = {
         "claude": "Claude CLI (claude-cli) & IDE plugin",
-        "cursor": "Cursor IDE & CLI",
         "gemini": "Gemini CLI (gemini) [Deprecated]",
         "codex": "Codex CLI (codex-cli) & IDE plugin",
         "antigravity": "Antigravity IDE",
         "antigravity-cli": "Antigravity CLI (antigravity-cli)",
+        "cursor": "Cursor IDE",
     }
 
     if target == "all-agents":
@@ -356,6 +407,29 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
 
     for t in targets:
         client_name = client_names.get(t, t)
+        if t == "cursor":
+            hook_command = f"python3 {install_dir / 'skills/codex_workflows/scripts/cursor_enforce_hook.py'}"
+            if project_dest is not None:
+                config_path = Path(project_dest) / ".cursor" / "hooks.json"
+            else:
+                config_path = target_global_config_path(t)
+            if config_path is None:
+                failed_wirings.append((client_name, "Could not locate the Cursor hooks configuration path."))
+                continue
+            try:
+                on_disk = None
+                if config_path.exists():
+                    on_disk = json.loads(config_path.read_text(encoding="utf-8"))
+                if on_disk:
+                    on_disk = strip_managed_cursor_hooks(on_disk, _MANAGED_HOOK_SCRIPTS)
+                final_config = merge_cursor_hooks(on_disk, desired_cursor_hooks(hook_command))
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                config_path.write_text(json.dumps(final_config, indent=2) + "\n", encoding="utf-8")
+                successful_wirings.append((client_name, str(config_path), hook_command))
+            except Exception as e:
+                failed_wirings.append((client_name, str(e)))
+            continue
+
         if project_dest is not None:
             # Local project install
             try:
@@ -374,15 +448,29 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
             if global_path is None:
                 if target != "all-agents":
                     failed_wirings.append((client_name, "Could not locate the global configuration path for this client."))
+                elif t == "antigravity":
+                    skipped_wirings.append(
+                        (
+                            client_name,
+                            "Antigravity IDE install directory not found (optional; plugin assets were still registered under ~/.gemini/antigravity-ide/plugins/)",
+                        )
+                    )
                 else:
-                    skipped_wirings.append((client_name, "Config directory/installation not found on this machine"))
+                    skipped_wirings.append((client_name, "Client installation/directory not found on this machine"))
                 continue
 
             if not global_path.parent.is_dir() and not global_path.exists():
                 if target != "all-agents":
                     failed_wirings.append((client_name, f"Configuration directory '{global_path.parent}' does not exist."))
+                elif t == "antigravity":
+                    skipped_wirings.append(
+                        (
+                            client_name,
+                            "Antigravity IDE install directory not found (optional; plugin assets were still registered under ~/.gemini/antigravity-ide/plugins/)",
+                        )
+                    )
                 else:
-                    skipped_wirings.append((client_name, "Client installation/directory not found"))
+                    skipped_wirings.append((client_name, f"Configuration directory '{global_path.parent}' does not exist."))
                 continue
 
             try:
@@ -443,6 +531,16 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
         print("=" * 70 + "\n")
         return 1
 
+    if project_dest is not None:
+        dest_path = Path(project_dest)
+        if wire_orchestrator_mcp(install_dir, dest_path):
+            print(f"Wired agentic-orchestrator MCP server → {dest_path / '.mcp.json'}")
+        else:
+            print(
+                f"Warning: Could not write agentic-orchestrator MCP config to {dest_path / '.mcp.json'}",
+                file=sys.stderr,
+            )
+
     # If --target all-agents was specified, but we could not wire anything, exit with an error.
     if target == "all-agents" and not successful_wirings:
         print("Error: None of the agent CLI clients could be successfully wired.", file=sys.stderr)
@@ -464,24 +562,11 @@ def wire(install_dir: Path, target: str, project_dest: str | None) -> int:
 
 def _extract_command(config: dict) -> str | None:
     """Pull the first hook command out of any supported config shape."""
-    hooks_block = config.get("hooks", {})
-    if isinstance(hooks_block, dict):
-        for event_hooks in hooks_block.values():
-            if isinstance(event_hooks, list):
-                for entry in event_hooks:
-                    if isinstance(entry, dict) and "command" in entry:
-                        return entry["command"]
-                    for hook in entry.get("hooks", []):
-                        if "command" in hook:
-                            return hook["command"]
-
     for section in ("hooks", "codex-enforcer"):
         block = config.get(section, {})
         for event_hooks in block.values():
             if isinstance(event_hooks, list):
                 for entry in event_hooks:
-                    if isinstance(entry, dict) and "command" in entry:
-                        return entry["command"]
                     for hook in entry.get("hooks", []):
                         if "command" in hook:
                             return hook["command"]
@@ -516,7 +601,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--target",
-        help="Agent host to wire: claude, cursor, codex, gemini, antigravity, all-agents.",
+        help="Agent host to wire: claude, codex, gemini, antigravity, cursor, all-agents.",
     )
     parser.add_argument(
         "--dest",
@@ -578,8 +663,8 @@ def main() -> int:
     # ── plugin registration step ──────────────────────────────────────────────
     if register_claude_plugin(install_dir):
         print(f"Registered plugin with Claude Code        → {Path.home() / '.claude' / 'plugins' / 'cache' / 'local'}")
-    if register_cursor_plugin(install_dir):
-        print(f"Registered plugin with Cursor             → {Path.home() / '.cursor' / 'plugins' / 'cache' / 'local'}")
+    else:
+        print("Warning: Could not register plugin with Claude Code", file=sys.stderr)
     if register_antigravity_plugin(install_dir):
         print(f"Registered plugin with Antigravity IDE    → {Path.home() / '.gemini' / 'antigravity-ide' / 'plugins'}")
     if register_antigravity_config_plugin(install_dir):
@@ -587,6 +672,8 @@ def main() -> int:
     if register_codex_plugin(install_dir):
         print(f"Registered plugin in Codex marketplace    → {Path.home() / '.agents' / 'plugins' / 'marketplace.json'}")
         print(f"  ⚠  Run once to activate Codex skills:  codex plugin add codex-workflows-plugin@personal")
+    else:
+        print("Warning: Could not register plugin in Codex marketplace", file=sys.stderr)
 
     # ── wire step ─────────────────────────────────────────────────────────────
     if args.target:

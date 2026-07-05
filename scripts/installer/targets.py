@@ -53,6 +53,7 @@ def target_global_config_path(target: str | Target) -> Path | None:
     Gemini  → ~/.gemini/settings.json
     Codex   → ~/.gemini/config/hooks.json  (Codex uses the Gemini CLI config layer)
     Antigravity → <ide-install>/.agents/hooks.json  (IDE directory is auto-discovered)
+    Cursor  → ~/.cursor/hooks.json (user) or <project>/.cursor/hooks.json (project)
     """
     home = Path.home()
     normalized = normalize_target(target)

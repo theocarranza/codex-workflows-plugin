@@ -4,48 +4,32 @@ from typing import Any
 
 from scripts.policy.events import CanonicalToolEvent, PolicyDecision
 
-_CURSOR_TOOL_ALIASES = {
-    "Shell": "run_command",
-    "Write": "write_to_file",
-    "StrReplace": "replace_file_content",
-    "Edit": "replace_file_content",
-}
-
 
 def parse_cursor_payload(payload: dict[str, Any], *, project_root: str, vault_dir: str) -> CanonicalToolEvent:
-    tool_call = payload.get("toolCall") or payload.get("tool_call") or {}
+    tool_name = payload.get("tool_name") or payload.get("toolName") or payload.get("tool") or ""
     tool_input = (
         payload.get("tool_input")
+        or payload.get("toolInput")
+        or payload.get("input")
         or payload.get("arguments")
-        or payload.get("args")
-        or tool_call.get("args")
-        or tool_call.get("input")
         or {}
     )
-    raw_tool_name = (
-        payload.get("tool_name")
-        or payload.get("tool")
-        or payload.get("name")
-        or tool_call.get("name")
-        or ""
-    )
-    tool_name = _CURSOR_TOOL_ALIASES.get(raw_tool_name, raw_tool_name)
-    command = tool_input.get("command") or tool_input.get("CommandLine")
+    command = tool_input.get("command") or tool_input.get("CommandLine") or ""
     file_path = (
         tool_input.get("path")
         or tool_input.get("file")
-        or tool_input.get("file_path")
         or tool_input.get("AbsolutePath")
         or tool_input.get("TargetFile")
     )
     source_path, destination_path = _parse_ticket_paths(command or "")
 
-    if not file_path and tool_name == "run_command" and source_path:
+    normalized_tool = str(tool_name)
+    if not file_path and normalized_tool in {"Shell", "Bash"} and source_path:
         file_path = source_path
 
     return CanonicalToolEvent(
         client="cursor",
-        tool_name=tool_name,
+        tool_name=normalized_tool,
         command=command,
         file_path=file_path,
         source_path=source_path,
@@ -58,12 +42,11 @@ def parse_cursor_payload(payload: dict[str, Any], *, project_root: str, vault_di
 
 def format_cursor_decision(decision: PolicyDecision) -> dict[str, Any]:
     if decision.is_denied():
-        reason = decision.reason or "Denied"
-        return {
-            "permission": "deny",
-            "user_message": reason,
-            "agent_message": reason,
-        }
+        response: dict[str, Any] = {"permission": "deny"}
+        if decision.reason:
+            response["agent_message"] = decision.reason
+            response["user_message"] = decision.reason
+        return response
     return {"permission": "allow"}
 
 

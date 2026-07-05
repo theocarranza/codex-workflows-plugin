@@ -13,7 +13,7 @@ _(nothing yet)_
 
 ---
 
-## [0.2.9] — 2026-07-05
+## [0.5.1] — 2026-07-05
 
 ### Added
 - **Full uninstall cleanup** (`scripts/installer/uninstall.py`, `scripts/installer/bootstrap.py`): `python3 -m scripts.installer.bootstrap --uninstall` now removes managed host hook entries, Claude/Cursor/Antigravity plugin caches, the Claude local plugin registry entry, the Codex personal marketplace entry, and the installed `~/.codex-workflows/` runtime by default.
@@ -22,12 +22,66 @@ _(nothing yet)_
 
 ### Changed
 - README installation docs now include the primary uninstall command and clarify optional project cleanup/runtime-retention flags.
-- Release metadata bumped to `0.2.9`.
+- Release metadata bumped to `0.5.1`.
 
 ### Fixed
 - **Claude hook response schema** (`scripts/adapters/claude_adapter.py`): Claude decisions now emit `hookSpecificOutput.permissionDecision` / `permissionDecisionReason` for `PreToolUse` instead of the legacy top-level `decision` / `reason` shape.
 - Claude payload parsing now recognizes `tool_input.file_path` for file-oriented tools.
 - Claude plugin registration now copies runtime `scripts/` dependencies into the Claude plugin cache so cached plugin hooks can import their runtime modules.
+
+---
+
+## [0.5.0] — 2026-07-02
+
+### Added
+- **Cursor IDE support**: `cursor` installer target wires `~/.cursor/hooks.json`; `cursor_adapter.py` and `cursor_enforce_hook.py` normalize Cursor `preToolUse` payloads (Read/Write/Shell tool names).
+- **`write-spec` skill**: Actor-Critic spec generation with templates (RFC, ADR, design doc, tech spec, SRS, implementation plan, bugfix spec, API contract), mistakes repository, and circuit breaker.
+- **Generic reflection engine** (`scripts/artifact_reflection.py`): shared `ReflectionEngine`, `CriticProfile`, and vault-wide `_mistakes/mistakes.json` (legacy `Specs/_mistakes/` still read).
+- **`resolve-ticket` Actor-Critic workflow**: resolution report at `<vault>/Specs/<slug>/resolution-report.md`, grounded on spec files and ticket ledger before archival.
+- **`start-ticket` spec hook**: returns `write_spec_directive` when required spec kinds are missing under `<vault>/Specs/<slug>/`.
+- **Spec/resolution runtimes**: `spec_runtime.py`, `resolution_runtime.py`, `spec_start_hook.py`, `resolve_ticket_hook.py`, and orchestrator handlers for `write-spec` and `resolve-ticket`.
+
+### Changed
+- **`start-ticket` / `resolve-ticket` manifests** bumped to v1.1.0 with input schemas and output signatures for orchestrator evaluation.
+- **Hook runtime**: honors `CURSOR_PROJECT_DIR` for project root; recognizes Cursor write/shell tool names.
+
+### Fixed
+- **Bootstrap Codex registration**: `register_codex_plugin()` catches `OSError` when `~/.agents/plugins/marketplace.json` is not writable — install completes with a warning instead of exiting non-zero.
+
+---
+
+## [0.4.0] — 2026-07-02
+
+### Added
+- **Slash commands** (`commands/`): user-invocable Claude Code commands for `start-ticket`, `resolve-ticket`, `review-pr`, `commit-prep`, `automated-tests`, `repository-sync`, and `bootstrap`. Copied into the Claude plugin cache on bootstrap alongside skills.
+- **Agentic orchestrator** (`scripts/orchestrator/`): event-sourced skill runner with schema validation, output evaluation, retry/circuit-breaker state machine, and an MCP stdio server (`agentic-orchestrator`). Invoked via `python3 -m scripts.orchestrator.mcp_server`.
+- **Skill manifests** (`skills/*/manifest.json`): MCP-discoverable input schemas and output signatures for orchestrated skills.
+- **`.claude-plugin/`** marketplace metadata for local Claude plugin distribution.
+- **`scripts/validate_plugin.py`**: portable manifest validator used by CI (replaces the machine-specific Codex plugin-creator path).
+- **Bootstrap orchestrator wiring**: `--dest` installs merge an `agentic-orchestrator` entry into the project's `.mcp.json` with absolute `PYTHONPATH` and `ORCHESTRATOR_SKILLS_DIR`.
+
+### Changed
+- **Installer/bootstrap**: copies `commands/` into the Claude plugin cache; warns when Claude plugin registration fails; Antigravity registration handles `OSError` without crashing bootstrap.
+- **Release packager**: includes `commands/` and `.claude-plugin/` in the release archive.
+- **`.mcp.json`**: adds `agentic-orchestrator` server entry for local development (skills dir resolved from module path when env is unset).
+
+### Fixed
+- **Orchestrator stream**: queued event dispatch prevents reentrancy drift when hooks emit nested events (e.g. `AuthorizationReceivedEvent`).
+- **Orchestrator engine**: propagates `max_retries` to the reducer; guards retry loops with `retry_count < max_retries`; fails fast on identical retry output.
+- **Orchestrator MCP server**: rejects non-dict JSON payloads; logs UI hooks to stderr to keep JSON-RPC stdout clean.
+- **Orchestrator evaluator**: honors `output_signature.required`; validates `integer` type; excludes booleans from integer/number checks.
+- **Manifest loader**: skips `manifest.json` files that parse to non-object JSON.
+- **Reducer**: dependency resolution no longer crashes on missing task IDs.
+- **`start-ticket` handler**: creates the active ledger file when a project root env var is set.
+- **`review-pr` command**: thin delegate to `skills/review-pr/SKILL.md` (removes duplicated workflow body).
+
+---
+
+## [0.3.0] — 2026-06-25
+
+### Added
+- **`review-pr` skill** (`skills/review-pr/`): four-phase skill that retrieves Azure DevOps pull request review threads, classifies each comment as comply or reject, presents a structured report for user review, then acts on confirmed decisions — applying code edits for comply items and posting rejection replies for reject items. Thread status is never mutated; only a reply is added. Results are persisted to `AI_Codex/Agent_Reports/YYYY-MM-DD-pr-review-<PR#>.md`.
+- **`.mcp.json`**: Azure DevOps MCP server config (`@azure-devops/mcp`, org `bhave-tecnologia-comportamental`) for local development of `review-pr`.
 
 ---
 

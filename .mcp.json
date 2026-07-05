@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "azure-devops": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "bhave-tecnologia-comportamental"]
+    },
+    "agentic-orchestrator": {
+      "command": "python3",
+      "args": ["-m", "scripts.orchestrator.mcp_server"]
+    }
+  }
+}

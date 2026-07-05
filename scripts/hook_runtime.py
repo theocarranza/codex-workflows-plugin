@@ -47,6 +47,10 @@ def log_debug(msg: str) -> None:
 
 
 def get_project_root() -> str:
+    for key in ("CURSOR_PROJECT_DIR", "CODEX_PROJECT_ROOT", "CLAUDE_PROJECT_DIR"):
+        value = os.environ.get(key, "").strip()
+        if value and os.path.isdir(value):
+            return value
     cwd = os.getcwd()
     while cwd != os.path.dirname(cwd):
         if os.path.exists(os.path.join(cwd, ".git")):
@@ -139,10 +143,16 @@ def run(client: str, input_data: dict[str, Any]) -> int:
     parser, _ = select_adapter(client)
     codex_event = parser(input_data, project_root=project_root, vault_dir=vault_dir)
     tool_name = codex_event.tool_name
-    arguments = input_data.get("tool_input") or input_data.get("arguments") or input_data.get("args") or {}
+    arguments = (
+        input_data.get("tool_input")
+        or input_data.get("toolInput")
+        or input_data.get("arguments")
+        or input_data.get("args")
+        or {}
+    )
     file_path = codex_event.file_path or arguments.get("AbsolutePath") or arguments.get("TargetFile") or arguments.get("path") or arguments.get("file") or ""
 
-    if tool_name == "run_command":
+    if tool_name in {"run_command", "Shell", "Bash"}:
         cmd = codex_event.command or arguments.get("CommandLine") or arguments.get("command") or ""
         destructive_decision = evaluate(
             CanonicalToolEvent(
@@ -265,7 +275,7 @@ def run(client: str, input_data: dict[str, Any]) -> int:
         emit_decision(client, PolicyDecision.deny(markdown_decision.reason or "Denied"))
         return 0
  
-    write_tools = ["write_to_file", "replace_file_content", "multi_replace_file_content"]
+    write_tools = ["write_to_file", "replace_file_content", "multi_replace_file_content", "Write", "StrReplace", "Edit"]
     if tool_name in write_tools:
         write_decision = evaluate(
             CanonicalToolEvent(

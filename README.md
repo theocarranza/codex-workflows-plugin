@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.2.8** — Installer now registers the plugin with Claude Code on every bootstrap run (skills appear in the plugin manager after session restart). Hook wiring is idempotent — stale entries from previous installs are stripped before re-wiring.
+> **v0.5.0** — Adds Cursor IDE hook wiring, Actor-Critic `write-spec` and `resolve-ticket` workflows with a shared reflection engine, and start-ticket spec generation hooks. Bootstrap tolerates unreadable Codex marketplace paths. **147 tests**, all passing.
 
 ## Purpose
 
@@ -19,19 +19,70 @@ scripts/
 ├── hook_runtime.py       # Entry point — orchestrates all policy checks
 ├── ticket_runtime.py     # Path extraction, YouTrack transcript scanner, bugfix inference
 ├── policy/               # Pure policy engine (engine.py, events.py, git_utils.py) — no I/O
-├── adapters/             # 4 host adapters: codex, gemini, claude, antigravity
-├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py)
-└── profiles/             # Workspace profiles (v0.3 scaffolding — not yet wired into runtime)
-skills/                   # 7 skill folders consumed by agent hosts
-.agent/workflows/         # 12 workflow guides synced to target projects on install
-.agent/rules/             # 27 coding & governance rule files synced to target projects
+├── adapters/             # 5 host adapters: codex, gemini, claude, antigravity, cursor
+├── installer/            # Multi-target hook wiring (cli.py, targets.py, merge.py, bootstrap.py)
+├── artifact_reflection.py # Shared Actor-Critic reflection engine for skill artifacts
+├── orchestrator/         # Event-sourced skill runner + MCP stdio server
+├── validate_plugin.py    # Portable manifest validator (used by CI)
+└── profiles/             # Workspace profiles (scaffolding — not yet wired into runtime)
+commands/                 # Slash commands synced to Claude plugin cache on bootstrap
+skills/                   # Skill folders + manifest.json for orchestrator MCP discovery
+.agent/workflows/         # Workflow guides synced to target projects on install
+.agent/rules/             # Coding & governance rule files synced to target projects
 ```
+
+## Skills & Slash Commands
+
+| Skill / Command | Description |
+|---|---|
+| `start-ticket` | Validates and activates a ticket from `Ready/` to `Active/`, enforcing git safety and YouTrack state. |
+| `resolve-ticket` | Actor-Critic resolution report grounded on specs, then archive; enforces YouTrack timer stop and spent time. |
+| `commit-prep` | Guides atomic commits following conventional-commit conventions. |
+| `automated-tests` | Runs the test suite and reports results in a structured format. |
+| `repository-sync` | Rebases the current branch onto the latest `origin/<base>`. |
+| `bootstrap` | One-time plugin install and host wiring. |
+| `write-spec` | Actor-Critic spec generation (RFC, ADR, design doc, tech spec, SRS, etc.) under `<vault>/Specs/`. Triggered by `/start-ticket` when specs are missing. |
+| `review-pr` | Retrieves Azure DevOps PR review threads, classifies each as comply or reject, presents a report for user confirmation, applies code edits for comply items, and posts rejection replies to threads (status never mutated). |
+| `codex_workflows` | Core hook enforcement script — not invoked directly. |
+
+Slash commands live in `commands/` and are registered into the Claude plugin cache alongside skills. Invoke in Claude Code as `/start-ticket`, `/review-pr <n>`, etc.
+
+### Agentic Orchestrator (MCP)
+
+The orchestrator exposes workflow skills as MCP tools over stdio:
+
+```bash
+python3 -m scripts.orchestrator.mcp_server
+```
+
+Add to a project's `.mcp.json` (bootstrap does this automatically with `--dest`):
+
+```json
+{
+  "mcpServers": {
+    "agentic-orchestrator": {
+      "command": "python3",
+      "args": ["-m", "scripts.orchestrator.mcp_server"],
+      "env": {
+        "PYTHONPATH": "/path/to/plugin",
+        "ORCHESTRATOR_SKILLS_DIR": "/path/to/plugin/skills"
+      }
+    }
+  }
+}
+```
+
+Each skill under `skills/<name>/` carries a `manifest.json` with `input_schema` and `output_signature` consumed by the orchestrator.
+
+---
 
 ## Packaging Boundary
 
 - Plugin metadata: `.codex-plugin/plugin.json`
+- Claude marketplace metadata: `.claude-plugin/`
 - Codex host wiring: `hooks/hooks.json`
 - Shared skill bundles: `skills/`
+- Slash commands: `commands/`
 - Release packager: `scripts/release_packager.py` emits `dist/codex-workflows-plugin-<version>.zip`
 
 ---
@@ -96,12 +147,13 @@ python3 -m scripts.installer.bootstrap
 
 No additional Python dependencies are needed — the plugin uses only the standard library.
 
-Bootstrap does two things automatically:
+Bootstrap does three things automatically:
 
 1. **Installs the runtime** to `~/.codex-workflows/` (the stable location hook commands reference).
-2. **Registers the plugin with supported local hosts** by refreshing Claude Code, Cursor, Antigravity, and Codex local plugin/cache or marketplace entries when those host directories are present. After this, plugin skills are discoverable after restarting the host session.
+2. **Registers the plugin with Claude Code** by copying the `skills/`, `commands/`, and runtime `scripts/` trees into `~/.claude/plugins/cache/local/codex-workflows-plugin/<version>/` and adding an entry to `~/.claude/plugins/installed_plugins.json`. After this, the plugin appears in Claude's plugin manager and its skills/commands are available to any Claude session.
+3. **Registers with Antigravity and Codex** marketplaces when those config directories exist on the machine.
 
-> **After bootstrapping, restart your active CLI or IDE session** for the newly registered skills and hooks to load.
+> **After bootstrapping, restart your Claude session** (close and reopen the IDE panel or CLI) for the newly registered skills and commands to appear.
 
 ### Step 2 — Wire your agent host(s)
 
@@ -127,7 +179,7 @@ The plugin auto-discovers each host's config location:
 | `codex` | `~/.gemini/config/hooks.json` | `PreToolUse` |
 | `antigravity` | `<ide-install>/.agents/hooks.json` (auto-discovered) | `PreToolUse` |
 | `antigravity-cli` | `~/.gemini/antigravity-cli/settings.json` | `BeforeTool` |
-| `all-agents` | all six above | — |
+| `all-agents` | all six above (skips hosts not installed) | — |
 
 Hook wiring is idempotent — re-running bootstrap strips any stale entries from previous installs before writing the fresh hook, so running it multiple times is safe.
 
@@ -139,7 +191,7 @@ To add project-level hooks alongside the global ones, pass `--dest`:
 python3 bootstrap.py codex-workflows-plugin-<version>.zip --target all-agents --dest /path/to/your/project
 ```
 
-This also syncs `.agent/workflows/*.md` and `.agent/rules/*.md` into the project.
+This also syncs `.agent/workflows/*.md` and `.agent/rules/*.md` into the project, and merges an `agentic-orchestrator` MCP server entry into the project's `.mcp.json`.
 
 ### Dry-run
 
@@ -175,7 +227,9 @@ Pass `--dest /path/to/project` to also remove generated project hook configs and
 python3 -m unittest discover -s test -p "test_*.py" -v
 ```
 
-**157 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime (path extraction, YouTrack transcript scanning with all 3 result reasons, timer/spent time verification, bugfix frontmatter inference), installer (dry-run and live `--dest` write, including recursive subdirectory copying and uninstall cleanup), profiles, and release packager.
+**157 tests**, all passing. Coverage spans: policy engine (including git safety checks), all 5 host adapters, ticket runtime, spec/resolution reflection, installer (dry-run, live `--dest` write, and uninstall cleanup), orchestrator (state machine, MCP server, evaluator, hooks), profiles, and release packager.
+
+CI also runs `python3 scripts/validate_plugin.py .` to verify the plugin manifest and skills layout.
 
 ---
 
@@ -185,6 +239,6 @@ python3 -m unittest discover -s test -p "test_*.py" -v
 python3 -m scripts.release_packager --output-dir dist/
 ```
 
-Emits `dist/codex-workflows-plugin-<version>.zip`. Version is read from `.codex-plugin/plugin.json`. The archive includes plugin metadata, hooks, skills, scripts, and docs — `__pycache__` and test directories are excluded.
+Emits `dist/codex-workflows-plugin-<version>.zip`. Version is read from `.codex-plugin/plugin.json`. The archive includes plugin metadata, hooks, skills, commands, scripts, and docs — `__pycache__` and test directories are excluded.
 
 See [CHANGELOG.md](./CHANGELOG.md) for full version history.
