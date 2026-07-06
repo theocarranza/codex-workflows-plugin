@@ -46,6 +46,21 @@ download_release_zip() {
     return
   fi
 
+  if command -v gh >/dev/null 2>&1; then
+    local gh_args=(release download -R "$REPO_SLUG" -p "codex-workflows-plugin-*.zip" -D "$TMP_DIR")
+    if [[ -n "${CODEX_WORKFLOWS_VERSION:-}" ]]; then
+      gh_args+=("${CODEX_WORKFLOWS_VERSION}")
+    fi
+    if gh "${gh_args[@]}"; then
+      local downloaded
+      downloaded="$(find "$TMP_DIR" -maxdepth 1 -type f -name 'codex-workflows-plugin-*.zip' | sort | tail -n 1)"
+      if [[ -n "$downloaded" ]]; then
+        mv "$downloaded" "$output"
+        return
+      fi
+    fi
+  fi
+
   python3 - "$REPO_SLUG" "${CODEX_WORKFLOWS_VERSION:-}" "$output" <<'PY'
 from __future__ import annotations
 

@@ -13,6 +13,16 @@ _(nothing yet)_
 
 ---
 
+## [0.5.3] — 2026-07-05
+
+### Fixed
+- **Private repository install path** (`install.sh`): the one-step installer now uses authenticated `gh release download` for the release zip when GitHub CLI is available, then falls back to unauthenticated Python downloads for public repositories. This fixes installs where `install.sh` was fetched with `gh` but the script failed with a GitHub `404` while downloading the release zip.
+
+### Changed
+- Plugin metadata bumped to `0.5.3` across Codex and Claude plugin manifests.
+
+---
+
 ## [0.5.2] — 2026-07-05
 
 ### Added

@@ -64,6 +64,51 @@ Path(os.environ["CODEX_WORKFLOWS_TEST_ARGV_OUT"]).write_text("\\n".join(sys.argv
 
         self.assertEqual(argv[1:], ["--uninstall", "--keep-runtime"])
 
+    def test_uses_gh_release_download_when_no_local_zip_is_supplied(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            argv_path = root / "argv.txt"
+            calls_path = root / "gh-calls.txt"
+            release_zip = self._make_release_zip(root)
+            gh = fake_bin / "gh"
+            gh.write_text(
+                f"""#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> {calls_path}
+dest="."
+while (($#)); do
+  if [[ "$1" == "-D" ]]; then
+    dest="$2"
+    shift 2
+    continue
+  fi
+  shift
+done
+cp {release_zip} "$dest/codex-workflows-plugin-test.zip"
+""",
+                encoding="utf-8",
+            )
+            gh.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "CODEX_WORKFLOWS_TEST_ARGV_OUT": str(argv_path),
+            }
+
+            result = subprocess.run(
+                ["bash", str(REPO_ROOT / "install.sh"), "--target", "claude"],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("release download", calls_path.read_text(encoding="utf-8"))
+            self.assertEqual(argv_path.read_text(encoding="utf-8").splitlines()[1:], ["--target", "claude"])
+
 
 if __name__ == "__main__":
     unittest.main()

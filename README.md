@@ -137,6 +137,14 @@ Install the latest release and wire all detected agent hosts:
 curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash
 ```
 
+For private repository access, download the installer with authenticated `gh` first:
+
+```bash
+tmp=$(mktemp -d)
+gh release download v0.5.3 -R theocarranza/codex-workflows-plugin -p install.sh -D "$tmp"
+bash "$tmp/install.sh"
+```
+
 To also wire a specific project with project-level hooks, pass `--dest`:
 
 ```bash
