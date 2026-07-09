@@ -2,7 +2,7 @@
 
 A portable, multi-host workspace automation plugin that enforces session bootstrapping, ticket lifecycle governance, YouTrack state gating, and git safety checks across agent-driven development workflows.
 
-> **v0.5.4** — Fixes Claude Code hook client detection (`hooks/hooks.json` now routes through `claude_enforce_hook.py`), adds authenticated `gh release download` fallback for private repo installs, and ships a per-repo `codex-workflow.config.json` so the markdown allowlist covers this plugin's own docs. **161 tests**, all passing.
+> **v0.5.5** — Fixes Claude Code hook client detection (`hooks/hooks.json` now routes through `claude_enforce_hook.py`), adds authenticated `gh release download` fallback for private repo installs, and ships a per-repo `codex-workflow.config.json` so the markdown allowlist covers this plugin's own docs. **161 tests**, all passing.
 
 ## Purpose
 

@@ -13,6 +13,17 @@ _(nothing yet)_
 
 ---
 
+## [0.5.5] — 2026-07-09
+
+### Added
+- **Per-repo codex-workflow allowlist config** (`.claude/codex-workflow.config.json`): project-scoped config so the `codex-workflow@codex-workflow-marketplace` plugin's markdown allowlist covers this repo's own docs (`CHANGELOG.md`, `README.md`, `skills/**/*.md`, `docs/**`, etc.) when working inside the plugin itself.
+
+### Changed
+- Plugin metadata bumped to `0.5.5` across Codex and Claude plugin manifests.
+- `.gitignore` now tracks `.claude/codex-workflow.config.json` via a negation rule while keeping the rest of `.claude/` local.
+
+---
+
 ## [0.5.4] — 2026-07-09
 
 ### Fixed
