@@ -10,6 +10,9 @@ From source after cloning:
 
 Install only (no wiring):
     python3 bootstrap.py codex-workflows-plugin-0.2.4.zip
+
+Full cleanup:
+    python3 -m scripts.installer.bootstrap --uninstall
 """
 
 from __future__ import annotations
@@ -131,6 +134,13 @@ def register_claude_plugin(install_dir: Path) -> bool:
     if src_commands.is_dir():
         try:
             shutil.copytree(src_commands, cache_dir / "commands", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        except OSError:
+            return False
+
+    src_scripts = install_dir / "scripts"
+    if src_scripts.is_dir():
+        try:
+            shutil.copytree(src_scripts, cache_dir / "scripts", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         except OSError:
             return False
 
@@ -574,7 +584,9 @@ def main() -> int:
             "  # install only\n"
             "  python3 bootstrap.py plugin.zip\n\n"
             "  # wire only (plugin already installed)\n"
-            "  python3 bootstrap.py --target claude --dest /my/project"
+            "  python3 bootstrap.py --target claude --dest /my/project\n\n"
+            "  # uninstall and remove runtime\n"
+            "  python3 -m scripts.installer.bootstrap --uninstall"
         ),
     )
     parser.add_argument(
@@ -595,11 +607,38 @@ def main() -> int:
         "--dest",
         help="Target project root to wire hooks into.",
     )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove managed host hooks, plugin registrations/caches, optional project assets, and the runtime install dir.",
+    )
+    parser.add_argument(
+        "--keep-runtime",
+        action="store_true",
+        help="With --uninstall, leave the runtime install dir in place.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="With --uninstall, print planned changes without modifying files.",
+    )
     args = parser.parse_args()
 
     # --dest is optional: omitting it wires the host's machine-global config location.
 
     install_dir = Path(args.install_dir).expanduser().resolve()
+
+    if args.uninstall:
+        from scripts.installer.uninstall import uninstall  # noqa: PLC0415
+
+        plan = uninstall(
+            install_dir,
+            dest=Path(args.dest) if args.dest else None,
+            keep_runtime=args.keep_runtime,
+            dry_run=args.dry_run,
+        )
+        print("\n".join(plan.messages) if plan.messages else "No managed plugin interventions found.")
+        return 0
 
     # ── install step ──────────────────────────────────────────────────────────
     script_dir = Path(__file__).parent.parent.parent.resolve()

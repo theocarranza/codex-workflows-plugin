@@ -49,6 +49,7 @@ def target_global_config_path(target: str | Target) -> Path | None:
     """Absolute path to the machine-global hook config for this target, if discoverable.
 
     Claude  → ~/.claude/settings.json
+    Cursor  → ~/.cursor/hooks.json
     Gemini  → ~/.gemini/settings.json
     Codex   → ~/.gemini/config/hooks.json  (Codex uses the Gemini CLI config layer)
     Antigravity → <ide-install>/.agents/hooks.json  (IDE directory is auto-discovered)

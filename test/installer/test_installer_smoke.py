@@ -90,6 +90,20 @@ class TestInstallerSmoke(unittest.TestCase):
                 _expected_cmd("claude_enforce_hook.py"),
             )
 
+    def test_cursor_target_writes_hooks_file(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_path = Path(tempdir) / "hooks.json"
+            result = self._run_installer("cursor", output_path)
+
+            self.assertTrue(output_path.exists())
+            self.assertEqual(result["configPaths"], [".cursor/hooks.json"])
+            content = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(content["version"], 1)
+            self.assertEqual(
+                content["hooks"]["preToolUse"][0]["command"],
+                _expected_cmd("cursor_enforce_hook.py"),
+            )
+
     def test_install_with_dest_syncs_workflows_to_agent_dir(self):
         """When --dest is provided, .agent/workflows/ files are synced to the target."""
         with tempfile.TemporaryDirectory() as tempdir:
@@ -139,7 +153,33 @@ class TestInstallerSmoke(unittest.TestCase):
             content = json.loads(hooks_file.read_text(encoding="utf-8"))
             self.assertIn("codex-enforcer", content)
 
+    def test_install_with_dest_writes_codex_claude_and_cursor_configs(self):
+        cases = [
+            ("codex", "hooks/hooks.json", ("hooks", "PreToolUse", 0, "hooks", 0, "command"), "codex_enforce_hook.py"),
+            ("claude", ".claude/settings.json", ("hooks", "PreToolUse", 0, "hooks", 0, "command"), "claude_enforce_hook.py"),
+            ("cursor", ".cursor/hooks.json", ("hooks", "preToolUse", 0, "command"), "cursor_enforce_hook.py"),
+        ]
+
+        for target, relative_path, command_path, script_name in cases:
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as tempdir:
+                completed = subprocess.run(
+                    [sys.executable, "-m", "scripts.installer.cli", "--target", target, "--dest", tempdir],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                result = json.loads(completed.stdout)
+                config_path = Path(tempdir) / relative_path
+                content = json.loads(config_path.read_text(encoding="utf-8"))
+                command = content
+                for key in command_path:
+                    command = command[key]
+
+                self.assertEqual(result["target"], target)
+                self.assertEqual(result["configPaths"], [relative_path])
+                self.assertTrue(config_path.exists())
+                self.assertEqual(command, _expected_cmd(script_name))
+
 
 if __name__ == "__main__":
     unittest.main()
-

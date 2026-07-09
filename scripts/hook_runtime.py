@@ -124,6 +124,9 @@ def emit_decision(client: str, decision: PolicyDecision) -> None:
 
 
 def run(client: str, input_data: dict[str, Any]) -> int:
+    if input_data.get("transcript_path") and not input_data.get("transcriptPath"):
+        input_data = {**input_data, "transcriptPath": input_data["transcript_path"]}
+
     project_root = get_project_root()
     vault_dir = get_vault_dir(project_root)
     capture_dir = os.environ.get("CODEX_WORKFLOW_CAPTURE_DIR")

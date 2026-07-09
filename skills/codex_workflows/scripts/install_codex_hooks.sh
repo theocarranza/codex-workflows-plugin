@@ -19,6 +19,9 @@ case "$TARGET" in
   claude)
     OUTPUT_PATH="$PROJECT_ROOT/.claude/settings.json"
     ;;
+  cursor)
+    OUTPUT_PATH="$PROJECT_ROOT/.cursor/hooks.json"
+    ;;
   universal|all-agents)
     OUTPUT_PATH=""
     ;;

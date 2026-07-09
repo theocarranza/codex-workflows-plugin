@@ -10,7 +10,13 @@ def parse_claude_payload(payload: dict[str, Any], *, project_root: str, vault_di
     tool_input = tool_call.get("args") or tool_call.get("input") or payload.get("tool_input") or payload.get("arguments") or {}
     tool_name = tool_call.get("name") or payload.get("tool_name") or payload.get("tool") or payload.get("name") or ""
     command = tool_input.get("CommandLine") or tool_input.get("command")
-    file_path = tool_input.get("AbsolutePath") or tool_input.get("TargetFile") or tool_input.get("path") or tool_input.get("file")
+    file_path = (
+        tool_input.get("AbsolutePath")
+        or tool_input.get("TargetFile")
+        or tool_input.get("path")
+        or tool_input.get("file")
+        or tool_input.get("file_path")
+    )
     source_path, destination_path = _parse_ticket_paths(command or "")
 
     if not file_path and tool_name == "Bash" and source_path:
@@ -30,12 +36,13 @@ def parse_claude_payload(payload: dict[str, Any], *, project_root: str, vault_di
 
 
 def format_claude_decision(decision: PolicyDecision) -> dict[str, Any]:
-    response = {
-        "decision": "deny" if decision.is_denied() else "allow",
+    hook_output = {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny" if decision.is_denied() else "allow",
     }
-    if decision.reason:
-        response["reason"] = decision.reason
-    return response
+    if decision.is_denied() and decision.reason:
+        hook_output["permissionDecisionReason"] = decision.reason
+    return {"hookSpecificOutput": hook_output}
 
 
 def _parse_ticket_paths(command: str) -> tuple[str | None, str | None]:

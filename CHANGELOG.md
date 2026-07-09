@@ -13,6 +13,59 @@ _(nothing yet)_
 
 ---
 
+## [0.5.4] — 2026-07-09
+
+### Fixed
+- **Claude Code marketplace hook client detection** (`hooks/hooks.json`): the repo's own Claude Code plugin manifest called `codex_enforce_hook.py` directly, which defaults `WORKFLOW_HOOK_CLIENT` to `codex`. That made this repo's own Claude Code session parse and format policy decisions with the Codex adapter instead of the Claude adapter. Now routes through `${CLAUDE_PLUGIN_ROOT}/skills/codex_workflows/scripts/claude_enforce_hook.py`, which sets `WORKFLOW_HOOK_CLIENT=claude` before delegating to the shared runtime. Other hosts and installer-driven installs were unaffected — they already wired their own dedicated `*_enforce_hook.py` wrapper.
+
+### Changed
+- Plugin metadata bumped to `0.5.4` across Codex and Claude plugin manifests.
+- Clarified in README and `SKILL.md` that `hooks/hooks.json` is the Claude Code marketplace hook manifest (not Codex's hook config, which the installer writes to `~/.gemini/config/hooks.json`).
+
+---
+
+## [0.5.3] — 2026-07-05
+
+### Fixed
+- **Private repository install path** (`install.sh`): the one-step installer now uses authenticated `gh release download` for the release zip when GitHub CLI is available, then falls back to unauthenticated Python downloads for public repositories. This fixes installs where `install.sh` was fetched with `gh` but the script failed with a GitHub `404` while downloading the release zip.
+
+### Changed
+- Plugin metadata bumped to `0.5.3` across Codex and Claude plugin manifests.
+
+---
+
+## [0.5.2] — 2026-07-05
+
+### Added
+- **One-step installer** (`install.sh`): supports `curl -fsSL https://github.com/theocarranza/codex-workflows-plugin/releases/latest/download/install.sh | bash`, downloads the latest GitHub release zip, extracts the bundled bootstrap script, and wires `--target all-agents` by default.
+- `CODEX_WORKFLOWS_VERSION` support for pinning a release tag and `CODEX_WORKFLOWS_RELEASE_ZIP` support for local/offline test installs.
+- Installer script tests covering default all-agents wiring, explicit target preservation, and uninstall argument passthrough.
+
+### Changed
+- README installation docs now lead with the one-step `curl | bash` flow instead of the broken `python3 bootstrap.py <zip>` example.
+- Release packages now include `install.sh`.
+- Plugin metadata bumped to `0.5.2` across Codex and Claude plugin manifests.
+
+---
+
+## [0.5.1] — 2026-07-05
+
+### Added
+- **Full uninstall cleanup** (`scripts/installer/uninstall.py`, `scripts/installer/bootstrap.py`): `python3 -m scripts.installer.bootstrap --uninstall` now removes managed host hook entries, Claude/Cursor/Antigravity plugin caches, the Claude local plugin registry entry, the Codex personal marketplace entry, and the installed `~/.codex-workflows/` runtime by default.
+- `--dest`, `--keep-runtime`, and `--dry-run` support for uninstall cleanup. `--dest` also removes generated project-level hook configs and known `.agent/workflows` / `.agent/rules` assets while preserving unrelated project files.
+- Temp-`HOME` uninstall integration coverage for full cleanup, project cleanup, runtime retention, and dry-run behavior.
+
+### Changed
+- README installation docs now include the primary uninstall command and clarify optional project cleanup/runtime-retention flags.
+- Release metadata bumped to `0.5.1`.
+
+### Fixed
+- **Claude hook response schema** (`scripts/adapters/claude_adapter.py`): Claude decisions now emit `hookSpecificOutput.permissionDecision` / `permissionDecisionReason` for `PreToolUse` instead of the legacy top-level `decision` / `reason` shape.
+- Claude payload parsing now recognizes `tool_input.file_path` for file-oriented tools.
+- Claude plugin registration now copies runtime `scripts/` dependencies into the Claude plugin cache so cached plugin hooks can import their runtime modules.
+
+---
+
 ## [0.5.0] — 2026-07-02
 
 ### Added

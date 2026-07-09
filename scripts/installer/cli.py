@@ -196,6 +196,20 @@ def install(
                     ]
                 }
             }
+        elif normalized_target == Target.CURSOR:
+            desired_hooks = {
+                "version": 1,
+                "hooks": {
+                    "preToolUse": [
+                        {
+                            "command": hook_command,
+                            "matcher": "Shell|Read|Write|Grep|Delete|Task",
+                            "timeout": 5,
+                            "failClosed": True,
+                        }
+                    ]
+                },
+            }
         else:
             desired_hooks = {
                 "hooks": {

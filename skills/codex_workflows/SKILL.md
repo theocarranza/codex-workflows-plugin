@@ -45,7 +45,7 @@ The skill contains pre-tool git/session execution hooks:
 ## Plugin Packaging
 
 - The Codex plugin manifest lives at `.codex-plugin/plugin.json`.
-- Hook routing for Codex lives at `hooks/hooks.json`.
+- `hooks/hooks.json` is the Claude Code marketplace plugin manifest (consumed via `${CLAUDE_PLUGIN_ROOT}` when this repo is loaded directly as a plugin) and routes to `claude_enforce_hook.py`, not Codex. Codex's own hook config is written by the installer to `~/.gemini/config/hooks.json`.
 - The shared policy/adaptor split is part of the migration work, not this skill's current runtime behavior.
 
 ## Sync Command / Usage

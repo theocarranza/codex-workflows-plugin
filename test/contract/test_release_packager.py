@@ -22,6 +22,7 @@ class TestReleasePackager(unittest.TestCase):
                 names = set(archive.namelist())
                 self.assertIn(".codex-plugin/plugin.json", names)
                 self.assertIn(".claude-plugin/plugin.json", names)
+                self.assertIn("install.sh", names)
                 self.assertTrue(any(name.startswith("commands/") for name in names))
                 self.assertIn("release-manifest.json", names)
                 manifest = json.loads(archive.read("release-manifest.json").decode("utf-8"))

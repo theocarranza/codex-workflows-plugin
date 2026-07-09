@@ -52,6 +52,7 @@ def _iter_release_files(repo_root: Path) -> Iterable[Path]:
     ]
     allow_files = {
         repo_root / "README.md",
+        repo_root / "install.sh",
         repo_root / "docs" / "roadmap.md",
         repo_root / "AI_Codex" / "README.md",
     }

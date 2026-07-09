@@ -99,6 +99,8 @@ class TestRegisterClaudePlugin(unittest.TestCase):
             (root / "skills" / "review-pr" / "manifest.json").write_text("{}", encoding="utf-8")
             (root / "commands").mkdir()
             (root / "commands" / "review-pr.md").write_text("# review-pr", encoding="utf-8")
+            (root / "scripts" / "adapters").mkdir(parents=True)
+            (root / "scripts" / "adapters" / "claude_adapter.py").write_text("# adapter", encoding="utf-8")
 
             fake_home_path = Path(fake_home)
             with patch.object(Path, "home", return_value=fake_home_path):
@@ -107,6 +109,7 @@ class TestRegisterClaudePlugin(unittest.TestCase):
             cache = fake_home_path / ".claude" / "plugins" / "cache" / "local" / "codex-workflows-plugin" / "9.9.9-test"
             self.assertTrue((cache / "skills" / "review-pr" / "manifest.json").exists())
             self.assertTrue((cache / "commands" / "review-pr.md").exists())
+            self.assertTrue((cache / "scripts" / "adapters" / "claude_adapter.py").exists())
             self.assertTrue((cache / "plugin.json").exists())
 
             registry = json.loads((fake_home_path / ".claude" / "plugins" / "installed_plugins.json").read_text())
