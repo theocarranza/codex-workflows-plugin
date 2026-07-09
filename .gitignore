@@ -5,6 +5,7 @@ __pycache__/
 
 # IDE and local configuration files
 .claude/
+!.claude/codex-workflow.config.json
 .gemini/
 .idea/
 .vscode/
