@@ -13,6 +13,17 @@ _(nothing yet)_
 
 ---
 
+## [0.5.4] — 2026-07-09
+
+### Fixed
+- **Claude Code marketplace hook client detection** (`hooks/hooks.json`): the repo's own Claude Code plugin manifest called `codex_enforce_hook.py` directly, which defaults `WORKFLOW_HOOK_CLIENT` to `codex`. That made this repo's own Claude Code session parse and format policy decisions with the Codex adapter instead of the Claude adapter. Now routes through `${CLAUDE_PLUGIN_ROOT}/skills/codex_workflows/scripts/claude_enforce_hook.py`, which sets `WORKFLOW_HOOK_CLIENT=claude` before delegating to the shared runtime. Other hosts and installer-driven installs were unaffected — they already wired their own dedicated `*_enforce_hook.py` wrapper.
+
+### Changed
+- Plugin metadata bumped to `0.5.4` across Codex and Claude plugin manifests.
+- Clarified in README and `SKILL.md` that `hooks/hooks.json` is the Claude Code marketplace hook manifest (not Codex's hook config, which the installer writes to `~/.gemini/config/hooks.json`).
+
+---
+
 ## [0.5.3] — 2026-07-05
 
 ### Fixed

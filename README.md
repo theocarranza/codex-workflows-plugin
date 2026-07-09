@@ -80,7 +80,7 @@ Each skill under `skills/<name>/` carries a `manifest.json` with `input_schema` 
 
 - Plugin metadata: `.codex-plugin/plugin.json`
 - Claude marketplace metadata: `.claude-plugin/`
-- Codex host wiring: `hooks/hooks.json`
+- Claude Code marketplace hook wiring (consumed via `${CLAUDE_PLUGIN_ROOT}` when this repo is loaded directly as a plugin, routes to `claude_enforce_hook.py`): `hooks/hooks.json`
 - Shared skill bundles: `skills/`
 - Slash commands: `commands/`
 - Release packager: `scripts/release_packager.py` emits `dist/codex-workflows-plugin-<version>.zip`
